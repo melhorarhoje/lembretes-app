@@ -1,0 +1,306 @@
+body {
+  width: 450px;
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f9;
+  margin: 0;
+  padding: 10px;
+  color: #333;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.icones-cabecalho i {
+  cursor: pointer;
+  margin-left: 10px;
+  color: #555;
+}
+
+.icones-cabecalho i.desabilitado {
+  color: #ccc;
+}
+
+#status-sincronizacao.sincronizando {
+  color: #ffa500;
+  animation: pulsar 1.5s infinite;
+}
+
+#status-sincronizacao.erro {
+  color: #dc2626;
+}
+
+#status-sincronizacao.sincronizado {
+  color: #059669;
+}
+
+@keyframes pulsar {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  padding: 12px 20px;
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+  z-index: 1000;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: all 0.3s ease;
+}
+
+.toast.mostrar {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast.sucesso { background-color: #059669; }
+.toast.erro { background-color: #dc2626; }
+.toast.info { background-color: #2563eb; }
+
+.container-entrada {
+  display: flex;
+  gap: 10px;
+}
+
+#entrada-lembrete {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+#entrada-lembrete:focus {
+  outline: none;
+  border-color: #6b7280;
+}
+
+button {
+  padding: 8px 16px;
+  background-color: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:hover {
+  background-color: #4b5563;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.btn-primario {
+  background-color: #2563eb;
+}
+
+.btn-primario:hover {
+  background-color: #1d4ed8;
+}
+
+.btn-secundario {
+  background-color: #6b7280;
+}
+
+.btn-secundario:hover {
+  background-color: #4b5563;
+}
+
+#lista-lembretes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.item-lembrete {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: white;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.item-lembrete:last-child {
+  margin-bottom: 0;
+}
+
+.conteudo-lembrete {
+  flex: 1;
+}
+
+.texto-lembrete {
+  font-size: 14px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+  font-weight: 600;
+ }
+
+.texto-lembrete:hover {
+  background-color: #f3f4f6;
+}
+
+.texto-lembrete.editando {
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+}
+
+.info-alarme {
+  font-size: 12px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-alarme.sem-alarme {
+  color: #9ca3af;
+}
+
+.acoes-lembrete {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.acoes-lembrete i {
+  cursor: pointer;
+  color: #6b7280;
+  transition: color 0.2s;
+}
+
+.acoes-lembrete i:hover {
+  color: #374151;
+}
+
+.fa-calendar:hover {
+  color: #2563eb;
+}
+
+.fa-bell:hover, .fa-bell-slash:hover {
+  color: #d97706;
+}
+
+.fa-trash:hover {
+  color: #dc2626;
+}
+
+.fa-edit:hover {
+  color: #059669;
+}
+
+/* Modal */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+}
+
+.modal-conteudo {
+  background-color: white;
+  margin: 10% auto;
+  padding: 0;
+  width: 350px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-cabecalho h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.fechar-modal {
+  cursor: pointer;
+  font-size: 20px;
+  color: #6b7280;
+}
+
+.fechar-modal:hover {
+  color: #374151;
+}
+
+.modal-corpo {
+  padding: 20px;
+}
+
+.campos-datahora {
+  display: flex;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.campo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.campo label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.campo input {
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.campo input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.modal-acoes {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.modal-acoes button {
+  flex: 1;
+}

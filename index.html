@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Lembretes</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="container">
+    <div class="cabecalho">
+      <h2>Lembretes</h2>
+      <div class="icones-cabecalho">
+        <i id="alternar-extensao" class="fas fa-power-off" title="Habilitar/Desabilitar Janela de Alarme"></i>
+        <i id="alternar-som-global" class="fas fa-volume-up" title="Habilitar/Desabilitar Som Geral"></i>
+        <i id="status-sincronizacao" class="fas fa-cloud" title="Sincronizado"></i>
+      </div>
+    </div>
+    
+    <!-- Toast para feedback -->
+    <div id="toast" class="toast"></div>
+    
+    <div class="container-entrada">
+      <input type="text" id="entrada-lembrete" placeholder="Digite seu lembrete">
+      <button id="adicionar-lembrete">Inserir</button>
+    </div>
+    
+    <ul id="lista-lembretes"></ul>
+  </div>
+
+  <!-- Modal para configurar data/hora -->
+  <div id="modal-datahora" class="modal">
+    <div class="modal-conteudo">
+      <div class="modal-cabecalho">
+        <h3>Configurar Alarme</h3>
+        <span class="fechar-modal">&times;</span>
+      </div>
+      <div class="modal-corpo">
+        <p id="texto-lembrete-modal"></p>
+        <div class="campos-datahora">
+          <div class="campo">
+            <label for="data-alarme">Data:</label>
+            <input type="date" id="data-alarme" min="">
+          </div>
+          <div class="campo">
+            <label for="hora-alarme">Hora:</label>
+            <input type="time" id="hora-alarme">
+          </div>
+        </div>
+        <div class="modal-acoes">
+          <button id="btn-remover-alarme" class="btn-secundario">Remover Alarme</button>
+          <button id="btn-salvar-alarme" class="btn-primario">Salvar Alarme</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

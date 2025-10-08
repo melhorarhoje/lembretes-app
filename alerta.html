@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Alerta</title>
+  <link rel="stylesheet" href="alerta.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="container-alerta">
+    <div class="cabecalho-alerta">
+      <h2>⏰ Alerta</h2>
+    </div>
+    
+    <div class="conteudo-alerta">
+      <div class="mensagem-lembrete">
+        <p id="texto-lembrete">Carregando...</p>
+      </div>
+      
+      <div class="hora-info">
+        <p id="hora-lembrete"></p>
+      </div>
+    </div>
+
+    <div class="controles-alerta">
+      <button id="silenciar-alarme">
+        <i class="fas fa-volume-mute"></i> Silenciar
+      </button>
+      
+      <button id="fechar-alerta">
+        <i class="fas fa-check"></i> OK
+      </button>
+    </div>
+  </div>
+  
+  <!-- Elemento de áudio para o alarme -->
+  <audio id="som-alarme"> <!--<audio id="som-alarme" loop></audio> -->
+    <source src="alarme.mp3" type="audio/mpeg">
+    <source src="alarme.wav" type="audio/wav">
+    Seu navegador não suporta o elemento de áudio.
+  </audio>
+
+  <script src="alerta.js"></script>
+</body>
+</html>
