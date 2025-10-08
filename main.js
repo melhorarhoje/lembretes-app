@@ -1,4 +1,4 @@
-// main.js - Processo Principal do Electron
+// main.js - PROCESSO PRINCIPAL COMPLETO
 const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
@@ -15,8 +15,7 @@ function createMainWindow() {
     height: 650,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true
+      contextIsolation: false
     },
     resizable: true,
     minimizable: true,
@@ -45,8 +44,7 @@ function createAlertaWindow(lembreteId) {
     resizable: false,
     minimizable: false,
     maximizable: false,
-    alwaysOnTop: true,
-    skipTaskbar: true
+    alwaysOnTop: true
   });
 
   alertaWindow.loadFile('alerta.html', { query: { id: lembreteId } });
@@ -55,24 +53,119 @@ function createAlertaWindow(lembreteId) {
   });
 }
 
-// Handlers para IPC (comunicação entre processos)
+// 🔥 HANDLERS PARA TODAS AS FUNÇÕES DO POPUP.JS
+
+// Configurações
+ipcMain.handle('carregar-configuracoes', () => {
+  return {
+    extensaoHabilitada: store.get('extensaoHabilitada', true),
+    somGlobalHabilitado: store.get('somGlobalHabilitado', true)
+  };
+});
+
+ipcMain.handle('salvar-configuracoes', (event, configuracoes) => {
+  store.set('extensaoHabilitada', configuracoes.extensaoHabilitada);
+  store.set('somGlobalHabilitado', configuracoes.somGlobalHabilitado);
+  return true;
+});
+
+// Lembretes
+ipcMain.handle('carregar-lembretes', () => {
+  return store.get('lembretes', {});
+});
+
 ipcMain.handle('salvar-lembretes', (event, lembretes) => {
   store.set('lembretes', lembretes);
   return true;
 });
 
-ipcMain.handle('carregar-lembretes', (event) => {
-  return store.get('lembretes', {});
+ipcMain.handle('adicionar-lembrete', (event, lembrete) => {
+  const lembretes = store.get('lembretes', {});
+  const id = Date.now().toString();
+  
+  lembretes[id] = {
+    ...lembrete,
+    id: id
+  };
+  
+  store.set('lembretes', lembretes);
+  return id;
 });
 
+ipcMain.handle('atualizar-texto-lembrete', (event, id, novoTexto) => {
+  const lembretes = store.get('lembretes', {});
+  
+  if (lembretes[id]) {
+    lembretes[id].mensagem = novoTexto;
+    lembretes[id].atualizadoEm = new Date().toISOString();
+    store.set('lembretes', lembretes);
+  }
+  
+  return true;
+});
+
+ipcMain.handle('excluir-lembrete', (event, id) => {
+  const lembretes = store.get('lembretes', {});
+  
+  if (lembretes[id]) {
+    delete lembretes[id];
+    store.set('lembretes', lembretes);
+  }
+  
+  return true;
+});
+
+// Alarmes
+ipcMain.handle('configurar-alarme', (event, id, dataHora) => {
+  const lembretes = store.get('lembretes', {});
+  
+  if (lembretes[id]) {
+    lembretes[id].dataHora = dataHora;
+    lembretes[id].atualizadoEm = new Date().toISOString();
+    store.set('lembretes', lembretes);
+    
+    // Agendar alarme (simulação - em produção usaria setTimeout)
+    const dataHoraObj = new Date(dataHora);
+    const agora = new Date();
+    const tempoRestante = dataHoraObj.getTime() - agora.getTime();
+    
+    if (tempoRestante > 0) {
+      setTimeout(() => {
+        createAlertaWindow(id);
+      }, tempoRestante);
+    }
+  }
+  
+  return true;
+});
+
+ipcMain.handle('remover-alarme', (event, id) => {
+  const lembretes = store.get('lembretes', {});
+  
+  if (lembretes[id]) {
+    lembretes[id].dataHora = null;
+    lembretes[id].atualizadoEm = new Date().toISOString();
+    store.set('lembretes', lembretes);
+  }
+  
+  return true;
+});
+
+ipcMain.handle('alternar-som-lembrete', (event, id) => {
+  const lembretes = store.get('lembretes', {});
+  
+  if (lembretes[id]) {
+    lembretes[id].somHabilitado = !lembretes[id].somHabilitado;
+    lembretes[id].atualizadoEm = new Date().toISOString();
+    store.set('lembretes', lembretes);
+  }
+  
+  return true;
+});
+
+// Janelas
 ipcMain.handle('abrir-janela-alerta', (event, lembreteId) => {
   createAlertaWindow(lembreteId);
-});
-
-ipcMain.handle('fechar-janela-alerta', (event) => {
-  if (alertaWindow) {
-    alertaWindow.close();
-  }
 });
 
 // Inicializar app
