@@ -5,9 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
-    "build-win": "electron-builder --win",
-    "build-portable": "electron-builder --win portable"
+    "build": "electron-builder --win portable"
   },
   "keywords": ["lembretes", "electron", "firebase"],
   "author": "Seu Nome",
@@ -26,18 +24,15 @@
       "output": "dist"
     },
     "files": [
-      "**/*",
-      "!node_modules/**/*",
-      "!dist/**/*"
+      "*.js",
+      "*.html",
+      "*.css",
+      "*.mp3",
+      "!node_modules",
+      "!dist"
     ],
     "win": {
-      "target": [
-        {
-          "target": "portable",
-          "arch": ["x64"]
-        }
-      ],
-      "icon": "assets/icon.ico"
+      "target": "portable"
     }
   }
 }
