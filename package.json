@@ -12,9 +12,7 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^27.0.0",
-    "electron-builder": "^24.6.4"
-  },
-  "dependencies": {
+    "electron-builder": "^24.6.4",
     "electron-store": "^8.1.0"
   },
   "build": {
@@ -24,10 +22,7 @@
       "output": "dist"
     },
     "files": [
-      "*.js",
-      "*.html",
-      "*.css",
-      "*.mp3",
+      "**/*",
       "!node_modules",
       "!dist"
     ],

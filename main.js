@@ -1,7 +1,31 @@
-// main.js - PROCESSO PRINCIPAL COMPLETO
+// main.js - VERSÃO SIMPLIFICADA SEM ELECTRON-STORE
 const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
-const Store = require('electron-store');
+const fs = require('fs');
+
+// Fallback: usar arquivo JSON simples para armazenamento
+function getStore() {
+  const storePath = path.join(__dirname, 'lembretes-data.json');
+  try {
+    if (fs.existsSync(storePath)) {
+      return JSON.parse(fs.readFileSync(storePath, 'utf8'));
+    }
+  } catch (error) {
+    console.log('Erro ao carregar dados, criando novo arquivo...');
+  }
+  return { lembretes: {}, configuracoes: { extensaoHabilitada: true, somGlobalHabilitado: true } };
+}
+
+function setStore(data) {
+  const storePath = path.join(__dirname, 'lembretes-data.json');
+  try {
+    fs.writeFileSync(storePath, JSON.stringify(data, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Erro ao salvar dados:', error);
+    return false;
+  }
+}
 
 // Configurar armazenamento
 const store = new Store();
@@ -53,66 +77,45 @@ function createAlertaWindow(lembreteId) {
   });
 }
 
-// 🔥 HANDLERS PARA TODAS AS FUNÇÕES DO POPUP.JS
+// 🔥 HANDLERS SIMPLIFICADOS SEM ELECTRON-STORE
 
 // Configurações
 ipcMain.handle('carregar-configuracoes', () => {
-  return {
-    extensaoHabilitada: store.get('extensaoHabilitada', true),
-    somGlobalHabilitado: store.get('somGlobalHabilitado', true)
-  };
+  const store = getStore();
+  return store.configuracoes;
 });
 
 ipcMain.handle('salvar-configuracoes', (event, configuracoes) => {
-  store.set('extensaoHabilitada', configuracoes.extensaoHabilitada);
-  store.set('somGlobalHabilitado', configuracoes.somGlobalHabilitado);
+  const store = getStore();
+  store.configuracoes = configuracoes;
+  setStore(store);
   return true;
 });
 
 // Lembretes
 ipcMain.handle('carregar-lembretes', () => {
-  return store.get('lembretes', {});
+  const store = getStore();
+  return store.lembretes;
 });
 
 ipcMain.handle('salvar-lembretes', (event, lembretes) => {
-  store.set('lembretes', lembretes);
+  const store = getStore();
+  store.lembretes = lembretes;
+  setStore(store);
   return true;
 });
 
 ipcMain.handle('adicionar-lembrete', (event, lembrete) => {
-  const lembretes = store.get('lembretes', {});
+  const store = getStore();
   const id = Date.now().toString();
   
-  lembretes[id] = {
+  store.lembretes[id] = {
     ...lembrete,
     id: id
   };
   
-  store.set('lembretes', lembretes);
+  setStore(store);
   return id;
-});
-
-ipcMain.handle('atualizar-texto-lembrete', (event, id, novoTexto) => {
-  const lembretes = store.get('lembretes', {});
-  
-  if (lembretes[id]) {
-    lembretes[id].mensagem = novoTexto;
-    lembretes[id].atualizadoEm = new Date().toISOString();
-    store.set('lembretes', lembretes);
-  }
-  
-  return true;
-});
-
-ipcMain.handle('excluir-lembrete', (event, id) => {
-  const lembretes = store.get('lembretes', {});
-  
-  if (lembretes[id]) {
-    delete lembretes[id];
-    store.set('lembretes', lembretes);
-  }
-  
-  return true;
 });
 
 // Alarmes
