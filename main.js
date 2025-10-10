@@ -1,35 +1,44 @@
-// main.js - VERSÃO SIMPLIFICADA SEM ELECTRON-STORE
+// main.js - VERSÃO TOTALMENTE LIMPA SEM DEPENDÊNCIAS EXTERNAS
 const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// Fallback: usar arquivo JSON simples para armazenamento
-function getStore() {
-  const storePath = path.join(__dirname, 'lembretes-data.json');
-  try {
-    if (fs.existsSync(storePath)) {
-      return JSON.parse(fs.readFileSync(storePath, 'utf8'));
+// Sistema de armazenamento simples com JSON
+class SimpleStore {
+  constructor() {
+    this.storePath = path.join(__dirname, 'dados-lembretes.json');
+    this.data = this.carregarDados();
+  }
+
+  carregarDados() {
+    try {
+      if (fs.existsSync(this.storePath)) {
+        return JSON.parse(fs.readFileSync(this.storePath, 'utf8'));
+      }
+    } catch (erro) {
+      console.log('Criando novo arquivo de dados...');
     }
-  } catch (error) {
-    console.log('Erro ao carregar dados, criando novo arquivo...');
+    return { 
+      lembretes: {}, 
+      configuracoes: { 
+        extensaoHabilitada: true, 
+        somGlobalHabilitado: true 
+      } 
+    };
   }
-  return { lembretes: {}, configuracoes: { extensaoHabilitada: true, somGlobalHabilitado: true } };
+
+  salvarDados() {
+    try {
+      fs.writeFileSync(this.storePath, JSON.stringify(this.data, null, 2));
+      return true;
+    } catch (erro) {
+      console.error('Erro ao salvar dados:', erro);
+      return false;
+    }
+  }
 }
 
-function setStore(data) {
-  const storePath = path.join(__dirname, 'lembretes-data.json');
-  try {
-    fs.writeFileSync(storePath, JSON.stringify(data, null, 2));
-    return true;
-  } catch (error) {
-    console.error('Erro ao salvar dados:', error);
-    return false;
-  }
-}
-
-// Configurar armazenamento
-const store = new Store();
-
+const store = new SimpleStore();
 let mainWindow;
 let alertaWindow;
 
@@ -48,13 +57,7 @@ function createMainWindow() {
   });
 
   mainWindow.loadFile('index.html');
-  
-  // Remover menu padrão para interface mais limpa
   Menu.setApplicationMenu(null);
-  
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
 }
 
 function createAlertaWindow(lembreteId) {
@@ -72,62 +75,57 @@ function createAlertaWindow(lembreteId) {
   });
 
   alertaWindow.loadFile('alerta.html', { query: { id: lembreteId } });
-  alertaWindow.on('closed', () => {
-    alertaWindow = null;
-  });
 }
 
-// 🔥 HANDLERS SIMPLIFICADOS SEM ELECTRON-STORE
-
-// Configurações
+// HANDLERS SIMPLIFICADOS
 ipcMain.handle('carregar-configuracoes', () => {
-  const store = getStore();
-  return store.configuracoes;
+  return store.data.configuracoes;
 });
 
 ipcMain.handle('salvar-configuracoes', (event, configuracoes) => {
-  const store = getStore();
-  store.configuracoes = configuracoes;
-  setStore(store);
+  store.data.configuracoes = configuracoes;
+  store.salvarDados();
   return true;
 });
 
-// Lembretes
 ipcMain.handle('carregar-lembretes', () => {
-  const store = getStore();
-  return store.lembretes;
-});
-
-ipcMain.handle('salvar-lembretes', (event, lembretes) => {
-  const store = getStore();
-  store.lembretes = lembretes;
-  setStore(store);
-  return true;
+  return store.data.lembretes;
 });
 
 ipcMain.handle('adicionar-lembrete', (event, lembrete) => {
-  const store = getStore();
   const id = Date.now().toString();
-  
-  store.lembretes[id] = {
+  store.data.lembretes[id] = {
     ...lembrete,
     id: id
   };
-  
-  setStore(store);
+  store.salvarDados();
   return id;
 });
 
-// Alarmes
+ipcMain.handle('atualizar-texto-lembrete', (event, id, novoTexto) => {
+  if (store.data.lembretes[id]) {
+    store.data.lembretes[id].mensagem = novoTexto;
+    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
+    store.salvarDados();
+  }
+  return true;
+});
+
+ipcMain.handle('excluir-lembrete', (event, id) => {
+  if (store.data.lembretes[id]) {
+    delete store.data.lembretes[id];
+    store.salvarDados();
+  }
+  return true;
+});
+
 ipcMain.handle('configurar-alarme', (event, id, dataHora) => {
-  const lembretes = store.get('lembretes', {});
-  
-  if (lembretes[id]) {
-    lembretes[id].dataHora = dataHora;
-    lembretes[id].atualizadoEm = new Date().toISOString();
-    store.set('lembretes', lembretes);
+  if (store.data.lembretes[id]) {
+    store.data.lembretes[id].dataHora = dataHora;
+    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
+    store.salvarDados();
     
-    // Agendar alarme (simulação - em produção usaria setTimeout)
+    // Agendar alarme simples
     const dataHoraObj = new Date(dataHora);
     const agora = new Date();
     const tempoRestante = dataHoraObj.getTime() - agora.getTime();
@@ -138,40 +136,31 @@ ipcMain.handle('configurar-alarme', (event, id, dataHora) => {
       }, tempoRestante);
     }
   }
-  
   return true;
 });
 
 ipcMain.handle('remover-alarme', (event, id) => {
-  const lembretes = store.get('lembretes', {});
-  
-  if (lembretes[id]) {
-    lembretes[id].dataHora = null;
-    lembretes[id].atualizadoEm = new Date().toISOString();
-    store.set('lembretes', lembretes);
+  if (store.data.lembretes[id]) {
+    store.data.lembretes[id].dataHora = null;
+    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
+    store.salvarDados();
   }
-  
   return true;
 });
 
 ipcMain.handle('alternar-som-lembrete', (event, id) => {
-  const lembretes = store.get('lembretes', {});
-  
-  if (lembretes[id]) {
-    lembretes[id].somHabilitado = !lembretes[id].somHabilitado;
-    lembretes[id].atualizadoEm = new Date().toISOString();
-    store.set('lembretes', lembretes);
+  if (store.data.lembretes[id]) {
+    store.data.lembretes[id].somHabilitado = !store.data.lembretes[id].somHabilitado;
+    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
+    store.salvarDados();
   }
-  
   return true;
 });
 
-// Janelas
 ipcMain.handle('abrir-janela-alerta', (event, lembreteId) => {
   createAlertaWindow(lembreteId);
 });
 
-// Inicializar app
 app.whenReady().then(createMainWindow);
 
 app.on('window-all-closed', () => {

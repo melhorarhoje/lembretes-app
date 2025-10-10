@@ -7,13 +7,16 @@
     "start": "electron .",
     "build": "electron-builder --win portable"
   },
-  "keywords": ["lembretes", "electron", "firebase"],
+  "keywords": [
+    "lembretes",
+    "electron",
+    "firebase"
+  ],
   "author": "Seu Nome",
   "license": "MIT",
   "devDependencies": {
     "electron": "^27.0.0",
-    "electron-builder": "^24.6.4",
-    "electron-store": "^8.1.0"
+    "electron-builder": "^24.6.4"
   },
   "build": {
     "appId": "com.lembretes.app",
