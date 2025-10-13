@@ -16,6 +16,60 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnRemoverAlarme = document.getElementById('btn-remover-alarme');
     const fecharModal = document.querySelector('.fechar-modal');
 
+    // Log do estado inicial do campo
+    if (!entradaLembrete) {
+        console.error('Erro: Campo entrada-lembrete não encontrado');
+    } else {
+        console.log('Estado inicial do campo entrada-lembrete:', {
+            disabled: entradaLembrete.disabled,
+            readonly: entradaLembrete.readOnly,
+            value: entradaLembrete.value,
+            focused: document.activeElement === entradaLembrete
+        });
+
+        // Forçar habilitação do campo
+        entradaLembrete.disabled = false;
+        entradaLembrete.readOnly = false;
+        entradaLembrete.focus();
+        console.log('Campo entrada-lembrete forçado para habilitado');
+
+        // Monitorar mudanças no atributo disabled
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'disabled') {
+                    console.log('Campo entrada-lembrete disabled mudou para:', entradaLembrete.disabled);
+                    entradaLembrete.disabled = false; // Forçar habilitação
+                }
+            });
+        });
+        observer.observe(entradaLembrete, { attributes: true });
+
+        // Monitorar eventos de interação
+        entradaLembrete.addEventListener('click', () => {
+            console.log('Clique no campo entrada-lembrete');
+        });
+        entradaLembrete.addEventListener('input', (e) => {
+            console.log('Input no campo entrada-lembrete:', e.target.value);
+        });
+        entradaLembrete.addEventListener('focus', () => {
+            console.log('Campo entrada-lembrete ganhou foco');
+        });
+        entradaLembrete.addEventListener('blur', () => {
+            console.log('Campo entrada-lembrete perdeu foco');
+        });
+    }
+
+    // Monitorar status do Firebase
+    ipcRenderer.on('get-status-sincronizacao', (event, status) => {
+        console.log('Status do Firebase:', status);
+        if (entradaLembrete && !status.firebase.online) {
+            console.log('Firebase offline, garantindo campo habilitado');
+            entradaLembrete.disabled = false;
+            entradaLembrete.focus();
+            mostrarToast('Firebase offline, modo local ativo', 'info');
+        }
+    });
+
     let lembreteEditandoId = null;
     let extensaoHabilitada = true;
     let somGlobalHabilitado = true;
