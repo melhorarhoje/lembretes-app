@@ -5,8 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win portable",
-    "build-all": "electron-builder -wml"
+    "build": "electron-builder --win portable"
   },
   "keywords": [
     "compi",
@@ -16,6 +15,9 @@
   ],
   "author": "Seu Nome",
   "license": "MIT",
+  "dependencies": {
+    "firebase": "^9.23.0"
+  },
   "devDependencies": {
     "electron": "^27.0.0",
     "electron-builder": "^24.6.4"
@@ -32,7 +34,8 @@
       "*.css",
       "*.mp3",
       "*.png",
-      "!node_modules",
+      "node_modules/firebase/**/*",
+      "!node_modules/**/*.{md,markdown,ts}",
       "!dist"
     ],
     "win": {

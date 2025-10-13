@@ -1,4 +1,7 @@
-// firebaseService.js - SERVIÇO FIREBASE COMPLETO PARA ELECTRON
+// firebaseService.js - CORRIGIDO PARA ELECTRON
+const firebase = require('firebase/app');
+require('firebase/firestore');
+
 class FirebaseService {
     constructor() {
         this.inicializado = false;
@@ -18,19 +21,44 @@ class FirebaseService {
         };
 
         try {
-            if (typeof firebase !== 'undefined' && firebase.apps.length === 0) {
+            // ✅ VERIFICAR SE JÁ EXISTE APP E EVITAR DUPLICAÇÃO
+            if (!firebase.apps.length) {
                 firebase.initializeApp(configFirebase);
-                this.bancoDados = firebase.firestore();
-                this.inicializado = true;
                 console.log('✅ Firebase inicializado com sucesso');
-            } else if (firebase.apps.length > 0) {
-                this.bancoDados = firebase.firestore();
-                this.inicializado = true;
+            } else {
+                firebase.app(); // Usar app existente
                 console.log('✅ Firebase já estava inicializado');
             }
+            
+            this.bancoDados = firebase.firestore();
+            this.inicializado = true;
+            
+            // ✅ CONFIGURAÇÕES DO FIRESTORE PARA MELHOR PERFORMANCE
+            this.bancoDados.settings({
+                cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+            });
+            
+            // ✅ VERIFICAR CONEXÃO
+            this.verificarConexao();
+            
         } catch (erro) {
             console.error('❌ Erro ao inicializar Firebase:', erro);
             this.inicializado = false;
+        }
+    }
+
+    // ✅ VERIFICAR CONEXÃO COM FIREBASE
+    async verificarConexao() {
+        if (!this.inicializado) return false;
+
+        try {
+            await this.bancoDados.collection('lembretesCompartilhados').limit(1).get();
+            console.log('✅ Conexão com Firebase estabelecida');
+            return true;
+        } catch (erro) {
+            console.error('❌ Sem conexão com Firebase:', erro.message);
+            this.inicializado = false;
+            return false;
         }
     }
 
@@ -55,20 +83,23 @@ class FirebaseService {
                         });
                     });
                     
-                    console.log(`🔄 Mudanças recebidas: ${mudancas.length} itens`);
+                    console.log(`🔄 Firebase: ${mudancas.length} mudança(s) recebida(s)`);
                     callback(mudancas);
                 }, (erro) => {
-                    console.error('❌ Erro ao observar mudanças Firebase:', erro);
+                    console.error('❌ Erro no observador Firebase:', erro);
+                    this.inicializado = false;
                 });
             
+            console.log('👂 Observador Firebase ativo');
             return this.observador;
         } catch (erro) {
-            console.error('❌ Erro ao criar observador Firebase:', erro);
+            console.error('❌ Erro ao criar observador:', erro);
+            this.inicializado = false;
             return null;
         }
     }
 
-    // ✅ PARAR DE OBSERVAR MUDANÇAS
+    // ✅ PARAR OBSERVAÇÃO
     pararObservacao() {
         if (this.observador) {
             this.observador();
@@ -85,8 +116,8 @@ class FirebaseService {
 
         try {
             const dadosFirebase = {
-                mensagem: lembrete.mensagem,
-                dataHora: lembrete.dataHora,
+                mensagem: lembrete.mensagem || '',
+                dataHora: lembrete.dataHora || null,
                 somHabilitado: lembrete.somHabilitado !== false,
                 criadoEm: lembrete.criadoEm || new Date().toISOString(),
                 atualizadoEm: new Date().toISOString()
@@ -94,20 +125,15 @@ class FirebaseService {
 
             let idFinal = lembrete.id;
 
-            if (lembrete.id && lembrete.id.startsWith('local_')) {
-                // ✅ ID local - criar novo no Firebase
-                const docRef = await this.bancoDados.collection('lembretesCompartilhados').add(dadosFirebase);
-                idFinal = docRef.id;
-                console.log(`✅ Local → Firebase: ${lembrete.id} → ${idFinal}`);
-            } else if (lembrete.id) {
-                // ✅ ID do Firebase - atualizar existente
+            // ✅ DETERMINAR SE É ATUALIZAÇÃO OU CRIAÇÃO
+            if (lembrete.id && !lembrete.id.startsWith('local_')) {
+                // ✅ ID DO FIREBASE - ATUALIZAR
                 await this.bancoDados.collection('lembretesCompartilhados')
                     .doc(lembrete.id)
                     .set(dadosFirebase, { merge: true });
-                idFinal = lembrete.id;
                 console.log(`✅ Firebase atualizado: ${lembrete.id}`);
             } else {
-                // ✅ Novo lembrete - criar no Firebase
+                // ✅ NOVO LEMBRETE - CRIAR
                 const docRef = await this.bancoDados.collection('lembretesCompartilhados').add(dadosFirebase);
                 idFinal = docRef.id;
                 console.log(`✅ Novo no Firebase: ${idFinal}`);
@@ -151,6 +177,12 @@ class FirebaseService {
             throw new Error('Firebase não inicializado');
         }
 
+        // ✅ SÓ EXCLUIR SE NÃO FOR ID LOCAL
+        if (id.startsWith('local_')) {
+            console.log(`⚠️ ID local ignorado: ${id}`);
+            return;
+        }
+
         try {
             await this.bancoDados.collection('lembretesCompartilhados').doc(id).delete();
             console.log(`✅ Firebase: lembrete ${id} excluído`);
@@ -174,7 +206,7 @@ class FirebaseService {
         };
     }
 
-    // ✅ VERIFICAR STATUS DA CONEXÃO
+    // ✅ VERIFICAR STATUS
     getStatus() {
         return {
             inicializado: this.inicializado,
@@ -185,3 +217,4 @@ class FirebaseService {
 
 // ✅ INSTÂNCIA GLOBAL
 const firebaseService = new FirebaseService();
+module.exports = firebaseService;
