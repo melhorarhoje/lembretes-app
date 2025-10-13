@@ -1,4 +1,4 @@
-// main.js - VERSÃO TOTALMENTE LIMPA SEM DEPENDÊNCIAS EXTERNAS
+// main.js - VERSÃO COMPLETA CORRIGIDA
 const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -36,6 +36,57 @@ class SimpleStore {
       return false;
     }
   }
+}
+
+const store = new SimpleStore();
+let mainWindow;
+let alertaWindow;
+
+// ✅ CONTROLE DE ALARMES ATIVOS
+const alarmesAtivos = new Map();
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    width: 500,
+    height: 650,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    resizable: true,
+    minimizable: true,
+    maximizable: false,
+    title: 'COMPI - Painel de Lembretes'
+  });
+
+  mainWindow.loadFile('index.html');
+  Menu.setApplicationMenu(null);
+}
+
+function createAlertaWindow(lembreteId) {
+  // ✅ VERIFICAR SE EXTENSÃO ESTÁ HABILITADA ANTES DE CRIAR ALERTA
+  const configuracoes = store.data.configuracoes;
+  if (!configuracoes.extensaoHabilitada) {
+    console.log('Extensão desabilitada - alerta bloqueado');
+    return null;
+  }
+
+  alertaWindow = new BrowserWindow({
+    width: 450,
+    height: 350,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    alwaysOnTop: true,
+    title: 'COMPI - Alerta'
+  });
+
+  alertaWindow.loadFile('alerta.html', { query: { id: lembreteId } });
+  return alertaWindow;
 }
 
 // ✅ REAGENDAR ALARMES AO INICIAR (APENAS SE EXTENSÃO HABILITADA)
@@ -80,57 +131,52 @@ function reagendarAlarmesAoIniciar() {
   store.salvarDados();
 }
 
-const store = new SimpleStore();
-let mainWindow;
-let alertaWindow;
+// ✅ HANDLERS ÚNICOS (SEM DUPLICAÇÃO)
 
-function createMainWindow() {
-  mainWindow = new BrowserWindow({
-    width: 500,
-    height: 650,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    },
-    resizable: true,
-    minimizable: true,
-    maximizable: false,
-    title: 'COMPI - Painel de lembretes'
-  });
+// Configurações
+ipcMain.handle('carregar-configuracoes', () => {
+  return store.data.configuracoes;
+});
 
-  mainWindow.loadFile('index.html');
-  Menu.setApplicationMenu(null);
-}
+ipcMain.handle('salvar-configuracoes', (event, configuracoes) => {
+  store.data.configuracoes = configuracoes;
+  store.salvarDados();
+  return true;
+});
 
-function createAlertaWindow(lembreteId) {
-  // ✅ VERIFICAR SE EXTENSÃO ESTÁ HABILITADA ANTES DE CRIAR ALERTA
-  const configuracoes = store.data.configuracoes;
-  if (!configuracoes.extensaoHabilitada) {
-    console.log('Extensão desabilitada - alerta bloqueado');
-    return null; // ✅ IMPEDIR COMPLETAMENTE A CRIAÇÃO DA JANELA
+// Lembretes
+ipcMain.handle('carregar-lembretes', () => {
+  return store.data.lembretes;
+});
+
+ipcMain.handle('adicionar-lembrete', (event, lembrete) => {
+  const id = Date.now().toString();
+  store.data.lembretes[id] = {
+    ...lembrete,
+    id: id
+  };
+  store.salvarDados();
+  return id;
+});
+
+ipcMain.handle('atualizar-texto-lembrete', (event, id, novoTexto) => {
+  if (store.data.lembretes[id]) {
+    store.data.lembretes[id].mensagem = novoTexto;
+    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
+    store.salvarDados();
   }
+  return true;
+});
 
-  alertaWindow = new BrowserWindow({
-    width: 450,
-    height: 350,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    },
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    alwaysOnTop: true,
-    title: 'COMPI - Alerta'  // ✅ CORRIGIDO - SEM COMENTÁRIO NA MESMA LINHA
-  });
+ipcMain.handle('excluir-lembrete', (event, id) => {
+  if (store.data.lembretes[id]) {
+    delete store.data.lembretes[id];
+    store.salvarDados();
+  }
+  return true;
+});
 
-  alertaWindow.loadFile('alerta.html', { query: { id: lembreteId } });
-  return alertaWindow;
-}
-
-// ✅ ADICIONAR CONTROLE DE ALARMES ATIVOS
-const alarmesAtivos = new Map();
-
+// Alarmes
 ipcMain.handle('configurar-alarme', (event, id, dataHora) => {
   if (store.data.lembretes[id]) {
     store.data.lembretes[id].dataHora = dataHora;
@@ -180,6 +226,15 @@ ipcMain.handle('remover-alarme', (event, id) => {
   return true;
 });
 
+ipcMain.handle('alternar-som-lembrete', (event, id) => {
+  if (store.data.lembretes[id]) {
+    store.data.lembretes[id].somHabilitado = !store.data.lembretes[id].somHabilitado;
+    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
+    store.salvarDados();
+  }
+  return true;
+});
+
 // ✅ NOVO HANDLER: DESATIVAR TODOS OS ALARMES
 ipcMain.handle('desativar-todos-alarmes', () => {
   for (const [id, alarme] of alarmesAtivos.entries()) {
@@ -190,86 +245,6 @@ ipcMain.handle('desativar-todos-alarmes', () => {
   return true;
 });
 
-// HANDLERS SIMPLIFICADOS
-ipcMain.handle('carregar-configuracoes', () => {
-  return store.data.configuracoes;
-});
-
-ipcMain.handle('salvar-configuracoes', (event, configuracoes) => {
-  store.data.configuracoes = configuracoes;
-  store.salvarDados();
-  return true;
-});
-
-ipcMain.handle('carregar-lembretes', () => {
-  return store.data.lembretes;
-});
-
-ipcMain.handle('adicionar-lembrete', (event, lembrete) => {
-  const id = Date.now().toString();
-  store.data.lembretes[id] = {
-    ...lembrete,
-    id: id
-  };
-  store.salvarDados();
-  return id;
-});
-
-ipcMain.handle('atualizar-texto-lembrete', (event, id, novoTexto) => {
-  if (store.data.lembretes[id]) {
-    store.data.lembretes[id].mensagem = novoTexto;
-    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
-    store.salvarDados();
-  }
-  return true;
-});
-
-ipcMain.handle('excluir-lembrete', (event, id) => {
-  if (store.data.lembretes[id]) {
-    delete store.data.lembretes[id];
-    store.salvarDados();
-  }
-  return true;
-});
-
-ipcMain.handle('configurar-alarme', (event, id, dataHora) => {
-  if (store.data.lembretes[id]) {
-    store.data.lembretes[id].dataHora = dataHora;
-    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
-    store.salvarDados();
-    
-    // Agendar alarme simples
-    const dataHoraObj = new Date(dataHora);
-    const agora = new Date();
-    const tempoRestante = dataHoraObj.getTime() - agora.getTime();
-    
-    if (tempoRestante > 0) {
-      setTimeout(() => {
-        createAlertaWindow(id);
-      }, tempoRestante);
-    }
-  }
-  return true;
-});
-
-ipcMain.handle('remover-alarme', (event, id) => {
-  if (store.data.lembretes[id]) {
-    store.data.lembretes[id].dataHora = null;
-    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
-    store.salvarDados();
-  }
-  return true;
-});
-
-ipcMain.handle('alternar-som-lembrete', (event, id) => {
-  if (store.data.lembretes[id]) {
-    store.data.lembretes[id].somHabilitado = !store.data.lembretes[id].somHabilitado;
-    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
-    store.salvarDados();
-  }
-  return true;
-});
-
 ipcMain.handle('abrir-janela-alerta', (event, lembreteId) => {
   createAlertaWindow(lembreteId);
 });
@@ -277,7 +252,7 @@ ipcMain.handle('abrir-janela-alerta', (event, lembreteId) => {
 // Inicializar app
 app.whenReady().then(() => {
   createMainWindow();
-  reagendarAlarmesAoIniciar(); // ✅ REAGENDAR ALARMES AO INICIAR
+  reagendarAlarmesAoIniciar();
 });
 
 app.on('window-all-closed', () => {
