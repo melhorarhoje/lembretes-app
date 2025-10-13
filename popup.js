@@ -326,9 +326,96 @@ document.addEventListener('DOMContentLoaded', async () => {
         return div.innerHTML;
     }
 
-    function iniciarEdicaoTexto(elemento, id, textoAtual) {
-        // ... (mantido igual do seu código)
+    // Iniciar edição do texto do lembrete - VERSÃO CORRIGIDA
+function iniciarEdicaoTexto(elemento, id, textoAtual) {
+    if (!elemento || !elemento.parentNode) {
+        console.error('Elemento ou parentNode não encontrado');
+        return;
     }
+
+    // Criar input de edição
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = textoAtual;
+    input.className = 'texto-lembrete-editando';
+    input.style.cssText = `
+        width: 100%;
+        border: 2px solid #2563eb;
+        border-radius: 4px;
+        padding: 6px 8px;
+        font-size: 14px;
+        font-family: inherit;
+        background: white;
+        box-sizing: border-box;
+    `;
+
+    // Substituir o elemento de texto pelo input
+    elemento.parentNode.replaceChild(input, elemento);
+    
+    // Focar e selecionar todo o texto
+    input.focus();
+    input.select();
+
+    // Função para salvar a edição
+    const salvarEdicao = () => {
+        const novoTexto = input.value.trim();
+        
+        if (!input.parentNode) {
+            console.error('ParentNode não encontrado ao salvar edição');
+            return;
+        }
+
+        // Restaurar elemento de texto
+        const novoElementoTexto = document.createElement('div');
+        novoElementoTexto.className = 'texto-lembrete';
+        novoElementoTexto.textContent = novoTexto || textoAtual;
+        novoElementoTexto.setAttribute('data-id', id);
+        
+        // Adicionar event listener para nova edição
+        novoElementoTexto.addEventListener('click', (e) => {
+            e.stopPropagation();
+            iniciarEdicaoTexto(e.target, id, novoTexto || textoAtual);
+        });
+        
+        input.parentNode.replaceChild(novoElementoTexto, input);
+
+        // Salvar apenas se o texto mudou
+        if (novoTexto && novoTexto !== textoAtual) {
+            atualizarTextoLembrete(id, novoTexto);
+        }
+    };
+
+    // Função para cancelar a edição
+    const cancelarEdicao = () => {
+        if (!input.parentNode) return;
+        
+        // Restaurar elemento original sem salvar
+        const novoElementoTexto = document.createElement('div');
+        novoElementoTexto.className = 'texto-lembrete';
+        novoElementoTexto.textContent = textoAtual;
+        novoElementoTexto.setAttribute('data-id', id);
+        novoElementoTexto.addEventListener('click', (e) => {
+            e.stopPropagation();
+            iniciarEdicaoTexto(e.target, id, textoAtual);
+        });
+        
+        input.parentNode.replaceChild(novoElementoTexto, input);
+    };
+
+    // Event listeners
+    input.addEventListener('blur', salvarEdicao);
+    
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            salvarEdicao();
+        } else if (e.key === 'Escape') {
+            cancelarEdicao();
+        }
+    });
+
+    // Prevenir propagação de eventos
+    input.addEventListener('click', (e) => e.stopPropagation());
+}
 
     function abrirModalConfigurarAlarme(id, mensagem, dataHora) {
         lembreteEditandoId = id;
