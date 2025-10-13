@@ -1,16 +1,18 @@
 {
   "name": "compi-lembretes",
   "version": "1.0.0",
-  "description": "COMPI - Painel de lembretes",
+  "description": "COMPI - Painel de Lembretes Compartilhados",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win portable"
+    "build": "electron-builder --win portable",
+    "build-all": "electron-builder -wml"
   },
-  "keywords": ["compi",
+  "keywords": [
+    "compi",
     "lembretes",
-    "electron",
-    "firebase"
+    "firebase",
+    "electron"
   ],
   "author": "Seu Nome",
   "license": "MIT",
@@ -20,7 +22,7 @@
   },
   "build": {
     "appId": "com.compi.lembretes",
-    "productName": "COMPI - Painel de lembretes",
+    "productName": "COMPI - Painel de Lembretes",
     "directories": {
       "output": "dist"
     },
@@ -29,6 +31,7 @@
       "*.html",
       "*.css",
       "*.mp3",
+      "*.png",
       "!node_modules",
       "!dist"
     ],
