@@ -201,20 +201,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             somGlobalHabilitado 
         });
         
-        // ✅ DESATIVAR/ATIVAR ALARMES
+        // ✅ CONTROLE COMPLETO DOS ALARMES
         if (!extensaoHabilitada) {
             await ipcRenderer.invoke('desativar-todos-alarmes');
-            mostrarToast('Extensão desabilitada - Nenhum alerta será disparado', 'info');
+            mostrarToast('🔕 Extensão DESABILITADA - Nenhum alerta será exibido', 'erro');
         } else {
-            mostrarToast('Extensão habilitada - Alertas ativados', 'sucesso');
-            
-            // Reagendar alarmes para lembretes existentes
+            // Reagendar todos os alarmes válidos
             const lembretes = await ipcRenderer.invoke('carregar-lembretes');
+            const agora = new Date();
+            let alarmesReagendados = 0;
+            
             for (const [id, lembrete] of Object.entries(lembretes)) {
-                if (lembrete.dataHora && new Date(lembrete.dataHora) > new Date()) {
+                if (lembrete.dataHora && new Date(lembrete.dataHora) > agora) {
                     await ipcRenderer.invoke('configurar-alarme', id, lembrete.dataHora);
+                    alarmesReagendados++;
                 }
             }
+            
+            mostrarToast(`🔔 Extensão HABILITADA - ${alarmesReagendados} alarme(s) ativo(s)`, 'sucesso');
         }
         
         atualizarIcones();
@@ -223,6 +227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Erro ao alternar extensão:', erro);
         mostrarToast('Erro ao alternar extensão', 'erro');
     }
+
 }
 
     async function alternarSomHandler() {

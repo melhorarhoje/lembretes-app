@@ -38,6 +38,48 @@ class SimpleStore {
   }
 }
 
+// ✅ REAGENDAR ALARMES AO INICIAR (APENAS SE EXTENSÃO HABILITADA)
+function reagendarAlarmesAoIniciar() {
+  const configuracoes = store.data.configuracoes;
+  
+  if (!configuracoes.extensaoHabilitada) {
+    console.log('Extensão desabilitada - nenhum alarme reagendado');
+    return;
+  }
+  
+  console.log('Reagendando alarmes ativos...');
+  const agora = new Date();
+  
+  for (const [id, lembrete] of Object.entries(store.data.lembretes)) {
+    if (lembrete.dataHora) {
+      const dataHoraObj = new Date(lembrete.dataHora);
+      const tempoRestante = dataHoraObj.getTime() - agora.getTime();
+      
+      if (tempoRestante > 0) {
+        // ✅ CANCELAR ALARME EXISTENTE
+        if (alarmesAtivos.has(id)) {
+          clearTimeout(alarmesAtivos.get(id));
+        }
+        
+        // ✅ AGENDAR NOVO ALARME
+        const alarmeId = setTimeout(() => {
+          createAlertaWindow(id);
+          alarmesAtivos.delete(id);
+        }, tempoRestante);
+        
+        alarmesAtivos.set(id, alarmeId);
+        console.log(`Alarme reagendado: ${lembrete.mensagem.substring(0, 20)}...`);
+      } else {
+        // ✅ LIMPAR ALARMES EXPIRADOS
+        lembrete.dataHora = null;
+        console.log(`Alarme expirado removido: ${lembrete.mensagem.substring(0, 20)}...`);
+      }
+    }
+  }
+  
+  store.salvarDados();
+}
+
 const store = new SimpleStore();
 let mainWindow;
 let alertaWindow;
@@ -61,12 +103,13 @@ function createMainWindow() {
 }
 
 function createAlertaWindow(lembreteId) {
-    // ✅ VERIFICAR SE EXTENSÃO ESTÁ HABILITADA ANTES DE CRIAR ALERTA
-     const configuracoes = store.data.configuracoes;
+  // ✅ VERIFICAR SE EXTENSÃO ESTÁ HABILITADA ANTES DE CRIAR ALERTA
+  const configuracoes = store.data.configuracoes;
   if (!configuracoes.extensaoHabilitada) {
-    console.log('Extensão desabilitada - alerta ignorado');
-    return;
+    console.log('Extensão desabilitada - alerta bloqueado');
+    return null; // ✅ IMPEDIR COMPLETAMENTE A CRIAÇÃO DA JANELA
   }
+
   alertaWindow = new BrowserWindow({
     width: 450,
     height: 350,
@@ -77,11 +120,12 @@ function createAlertaWindow(lembreteId) {
     resizable: false,
     minimizable: false,
     maximizable: false,
-    alwaysOnTop: true
-    title: 'COMPI - Alerta'  // ✅ NOVO TÍTULO
+    alwaysOnTop: true,
+    title: 'COMPI - Alerta'  // ✅ CORRIGIDO - SEM COMENTÁRIO NA MESMA LINHA
   });
 
   alertaWindow.loadFile('alerta.html', { query: { id: lembreteId } });
+  return alertaWindow;
 }
 
 // ✅ ADICIONAR CONTROLE DE ALARMES ATIVOS
@@ -103,13 +147,19 @@ ipcMain.handle('configurar-alarme', (event, id, dataHora) => {
         clearTimeout(alarmesAtivos.get(id));
       }
       
-      // ✅ AGENDAR NOVO ALARME (só se extensão habilitada)
-      const alarmeId = setTimeout(() => {
-        createAlertaWindow(id);
-        alarmesAtivos.delete(id);
-      }, tempoRestante);
-      
-      alarmesAtivos.set(id, alarmeId);
+      // ✅ SÓ AGENDAR SE EXTENSÃO ESTIVER HABILITADA
+      const configuracoes = store.data.configuracoes;
+      if (configuracoes.extensaoHabilitada) {
+        const alarmeId = setTimeout(() => {
+          createAlertaWindow(id);
+          alarmesAtivos.delete(id);
+        }, tempoRestante);
+        
+        alarmesAtivos.set(id, alarmeId);
+        console.log(`Alarme agendado para: ${dataHoraObj.toLocaleString()}`);
+      } else {
+        console.log('Extensão desabilitada - alarme não agendado');
+      }
     }
   }
   return true;
@@ -224,7 +274,11 @@ ipcMain.handle('abrir-janela-alerta', (event, lembreteId) => {
   createAlertaWindow(lembreteId);
 });
 
-app.whenReady().then(createMainWindow);
+// Inicializar app
+app.whenReady().then(() => {
+  createMainWindow();
+  reagendarAlarmesAoIniciar(); // ✅ REAGENDAR ALARMES AO INICIAR
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
