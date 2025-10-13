@@ -1,38 +1,54 @@
-// main.js - VERSÃO COMPLETA CORRIGIDA
+// main.js - VERSÃO COMPLETA COM PERSISTÊNCIA CORRIGIDA
 const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// Sistema de armazenamento simples com JSON
+// Sistema de armazenamento corrigido - persiste dados entre execuções
 class SimpleStore {
   constructor() {
-    this.storePath = path.join(__dirname, 'dados-lembretes.json');
+    // ✅ USAR app.getPath('userData') para pasta persistente
+    const userDataPath = app.getPath('userData');
+    this.storePath = path.join(userDataPath, 'dados-lembretes.json');
     this.data = this.carregarDados();
+    console.log('Arquivo de dados:', this.storePath);
   }
 
   carregarDados() {
     try {
       if (fs.existsSync(this.storePath)) {
-        return JSON.parse(fs.readFileSync(this.storePath, 'utf8'));
+        const dados = JSON.parse(fs.readFileSync(this.storePath, 'utf8'));
+        console.log('Dados carregados:', Object.keys(dados.lembretes).length, 'lembretes');
+        return dados;
       }
     } catch (erro) {
-      console.log('Criando novo arquivo de dados...');
+      console.log('Erro ao carregar dados, criando novo arquivo...', erro);
     }
-    return { 
+    
+    // Dados padrão se arquivo não existir
+    const dadosPadrao = { 
       lembretes: {}, 
       configuracoes: { 
         extensaoHabilitada: true, 
         somGlobalHabilitado: true 
       } 
     };
+    console.log('Criando novo arquivo de dados...');
+    return dadosPadrao;
   }
 
   salvarDados() {
     try {
+      // ✅ GARANTIR que a pasta existe
+      const pasta = path.dirname(this.storePath);
+      if (!fs.existsSync(pasta)) {
+        fs.mkdirSync(pasta, { recursive: true });
+      }
+      
       fs.writeFileSync(this.storePath, JSON.stringify(this.data, null, 2));
+      console.log('Dados salvos com sucesso em:', this.storePath);
       return true;
     } catch (erro) {
-      console.error('Erro ao salvar dados:', erro);
+      console.error('ERRO CRÍTICO ao salvar dados:', erro);
       return false;
     }
   }
@@ -100,6 +116,7 @@ function reagendarAlarmesAoIniciar() {
   
   console.log('Reagendando alarmes ativos...');
   const agora = new Date();
+  let alarmesReagendados = 0;
   
   for (const [id, lembrete] of Object.entries(store.data.lembretes)) {
     if (lembrete.dataHora) {
@@ -119,6 +136,7 @@ function reagendarAlarmesAoIniciar() {
         }, tempoRestante);
         
         alarmesAtivos.set(id, alarmeId);
+        alarmesReagendados++;
         console.log(`Alarme reagendado: ${lembrete.mensagem.substring(0, 20)}...`);
       } else {
         // ✅ LIMPAR ALARMES EXPIRADOS
@@ -128,10 +146,11 @@ function reagendarAlarmesAoIniciar() {
     }
   }
   
+  console.log(`Total de alarmes reagendados: ${alarmesReagendados}`);
   store.salvarDados();
 }
 
-// ✅ HANDLERS ÚNICOS (SEM DUPLICAÇÃO)
+// ✅ HANDLERS ÚNICOS
 
 // Configurações
 ipcMain.handle('carregar-configuracoes', () => {
@@ -155,7 +174,8 @@ ipcMain.handle('adicionar-lembrete', (event, lembrete) => {
     ...lembrete,
     id: id
   };
-  store.salvarDados();
+  store.salvarDados(); // ✅ SALVAR IMEDIATAMENTE
+  console.log('Lembrete adicionado e salvo:', id);
   return id;
 });
 
@@ -163,7 +183,7 @@ ipcMain.handle('atualizar-texto-lembrete', (event, id, novoTexto) => {
   if (store.data.lembretes[id]) {
     store.data.lembretes[id].mensagem = novoTexto;
     store.data.lembretes[id].atualizadoEm = new Date().toISOString();
-    store.salvarDados();
+    store.salvarDados(); // ✅ SALVAR IMEDIATAMENTE
   }
   return true;
 });
@@ -171,7 +191,7 @@ ipcMain.handle('atualizar-texto-lembrete', (event, id, novoTexto) => {
 ipcMain.handle('excluir-lembrete', (event, id) => {
   if (store.data.lembretes[id]) {
     delete store.data.lembretes[id];
-    store.salvarDados();
+    store.salvarDados(); // ✅ SALVAR IMEDIATAMENTE
   }
   return true;
 });
@@ -181,19 +201,17 @@ ipcMain.handle('configurar-alarme', (event, id, dataHora) => {
   if (store.data.lembretes[id]) {
     store.data.lembretes[id].dataHora = dataHora;
     store.data.lembretes[id].atualizadoEm = new Date().toISOString();
-    store.salvarDados();
+    store.salvarDados(); // ✅ SALVAR IMEDIATAMENTE
     
     const dataHoraObj = new Date(dataHora);
     const agora = new Date();
     const tempoRestante = dataHoraObj.getTime() - agora.getTime();
     
     if (tempoRestante > 0) {
-      // ✅ CANCELAR ALARME EXISTENTE SE HOUVER
       if (alarmesAtivos.has(id)) {
         clearTimeout(alarmesAtivos.get(id));
       }
       
-      // ✅ SÓ AGENDAR SE EXTENSÃO ESTIVER HABILITADA
       const configuracoes = store.data.configuracoes;
       if (configuracoes.extensaoHabilitada) {
         const alarmeId = setTimeout(() => {
@@ -215,9 +233,8 @@ ipcMain.handle('remover-alarme', (event, id) => {
   if (store.data.lembretes[id]) {
     store.data.lembretes[id].dataHora = null;
     store.data.lembretes[id].atualizadoEm = new Date().toISOString();
-    store.salvarDados();
+    store.salvarDados(); // ✅ SALVAR IMEDIATAMENTE
     
-    // ✅ CANCELAR ALARME ATIVO
     if (alarmesAtivos.has(id)) {
       clearTimeout(alarmesAtivos.get(id));
       alarmesAtivos.delete(id);
@@ -230,12 +247,11 @@ ipcMain.handle('alternar-som-lembrete', (event, id) => {
   if (store.data.lembretes[id]) {
     store.data.lembretes[id].somHabilitado = !store.data.lembretes[id].somHabilitado;
     store.data.lembretes[id].atualizadoEm = new Date().toISOString();
-    store.salvarDados();
+    store.salvarDados(); // ✅ SALVAR IMEDIATAMENTE
   }
   return true;
 });
 
-// ✅ NOVO HANDLER: DESATIVAR TODOS OS ALARMES
 ipcMain.handle('desativar-todos-alarmes', () => {
   for (const [id, alarme] of alarmesAtivos.entries()) {
     clearTimeout(alarme);
