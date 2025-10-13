@@ -1,13 +1,13 @@
 {
-  "name": "lembretes-app",
+  "name": "compi-lembretes",
   "version": "1.0.0",
-  "description": "Sistema de Lembretes Compartilhados com Firebase",
+  "description": "COMPI - Painel de lembretes",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win portable"
   },
-  "keywords": [
+  "keywords": ["compi",
     "lembretes",
     "electron",
     "firebase"
@@ -19,13 +19,16 @@
     "electron-builder": "^24.6.4"
   },
   "build": {
-    "appId": "com.lembretes.app",
-    "productName": "Lembretes Compartilhados",
+    "appId": "com.compi.lembretes",
+    "productName": "COMPI - Painel de lembretes",
     "directories": {
       "output": "dist"
     },
     "files": [
-      "**/*",
+      "*.js",
+      "*.html",
+      "*.css",
+      "*.mp3",
       "!node_modules",
       "!dist"
     ],

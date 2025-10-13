@@ -53,7 +53,7 @@ function createMainWindow() {
     resizable: true,
     minimizable: true,
     maximizable: false,
-    title: 'Lembretes Compartilhados'
+    title: 'COMPI - Painel de lembretes'
   });
 
   mainWindow.loadFile('index.html');
@@ -61,6 +61,12 @@ function createMainWindow() {
 }
 
 function createAlertaWindow(lembreteId) {
+    // ✅ VERIFICAR SE EXTENSÃO ESTÁ HABILITADA ANTES DE CRIAR ALERTA
+     const configuracoes = store.data.configuracoes;
+  if (!configuracoes.extensaoHabilitada) {
+    console.log('Extensão desabilitada - alerta ignorado');
+    return;
+  }
   alertaWindow = new BrowserWindow({
     width: 450,
     height: 350,
@@ -72,10 +78,67 @@ function createAlertaWindow(lembreteId) {
     minimizable: false,
     maximizable: false,
     alwaysOnTop: true
+    title: 'COMPI - Alerta'  // ✅ NOVO TÍTULO
   });
 
   alertaWindow.loadFile('alerta.html', { query: { id: lembreteId } });
 }
+
+// ✅ ADICIONAR CONTROLE DE ALARMES ATIVOS
+const alarmesAtivos = new Map();
+
+ipcMain.handle('configurar-alarme', (event, id, dataHora) => {
+  if (store.data.lembretes[id]) {
+    store.data.lembretes[id].dataHora = dataHora;
+    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
+    store.salvarDados();
+    
+    const dataHoraObj = new Date(dataHora);
+    const agora = new Date();
+    const tempoRestante = dataHoraObj.getTime() - agora.getTime();
+    
+    if (tempoRestante > 0) {
+      // ✅ CANCELAR ALARME EXISTENTE SE HOUVER
+      if (alarmesAtivos.has(id)) {
+        clearTimeout(alarmesAtivos.get(id));
+      }
+      
+      // ✅ AGENDAR NOVO ALARME (só se extensão habilitada)
+      const alarmeId = setTimeout(() => {
+        createAlertaWindow(id);
+        alarmesAtivos.delete(id);
+      }, tempoRestante);
+      
+      alarmesAtivos.set(id, alarmeId);
+    }
+  }
+  return true;
+});
+
+ipcMain.handle('remover-alarme', (event, id) => {
+  if (store.data.lembretes[id]) {
+    store.data.lembretes[id].dataHora = null;
+    store.data.lembretes[id].atualizadoEm = new Date().toISOString();
+    store.salvarDados();
+    
+    // ✅ CANCELAR ALARME ATIVO
+    if (alarmesAtivos.has(id)) {
+      clearTimeout(alarmesAtivos.get(id));
+      alarmesAtivos.delete(id);
+    }
+  }
+  return true;
+});
+
+// ✅ NOVO HANDLER: DESATIVAR TODOS OS ALARMES
+ipcMain.handle('desativar-todos-alarmes', () => {
+  for (const [id, alarme] of alarmesAtivos.entries()) {
+    clearTimeout(alarme);
+  }
+  alarmesAtivos.clear();
+  console.log('Todos os alarmes foram desativados');
+  return true;
+});
 
 // HANDLERS SIMPLIFICADOS
 ipcMain.handle('carregar-configuracoes', () => {

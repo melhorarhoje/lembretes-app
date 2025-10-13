@@ -192,18 +192,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function alternarExtensaoHandler() {
-        try {
-            extensaoHabilitada = !extensaoHabilitada;
-            await ipcRenderer.invoke('salvar-configuracoes', { extensaoHabilitada, somGlobalHabilitado });
-            atualizarIcones();
+    try {
+        extensaoHabilitada = !extensaoHabilitada;
+        
+        // ✅ SALVAR CONFIGURAÇÃO
+        await ipcRenderer.invoke('salvar-configuracoes', { 
+            extensaoHabilitada, 
+            somGlobalHabilitado 
+        });
+        
+        // ✅ DESATIVAR/ATIVAR ALARMES
+        if (!extensaoHabilitada) {
+            await ipcRenderer.invoke('desativar-todos-alarmes');
+            mostrarToast('Extensão desabilitada - Nenhum alerta será disparado', 'info');
+        } else {
+            mostrarToast('Extensão habilitada - Alertas ativados', 'sucesso');
             
-            const mensagem = extensaoHabilitada ? 'Extensão habilitada' : 'Extensão desabilitada';
-            mostrarToast(mensagem, 'info');
-        } catch (erro) {
-            console.error('Erro ao alternar extensão:', erro);
-            mostrarToast('Erro ao alternar extensão', 'erro');
+            // Reagendar alarmes para lembretes existentes
+            const lembretes = await ipcRenderer.invoke('carregar-lembretes');
+            for (const [id, lembrete] of Object.entries(lembretes)) {
+                if (lembrete.dataHora && new Date(lembrete.dataHora) > new Date()) {
+                    await ipcRenderer.invoke('configurar-alarme', id, lembrete.dataHora);
+                }
+            }
         }
+        
+        atualizarIcones();
+        
+    } catch (erro) {
+        console.error('Erro ao alternar extensão:', erro);
+        mostrarToast('Erro ao alternar extensão', 'erro');
     }
+}
 
     async function alternarSomHandler() {
         try {
@@ -235,15 +255,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         statusSincronizacao.title = titulos[status] || 'Sincronização';
     }
 
-    function mostrarToast(mensagem, tipo = 'info') {
-        const toast = document.getElementById('toast');
-        toast.textContent = mensagem;
-        toast.className = `toast mostrar ${tipo}`;
-        
-        setTimeout(() => {
-            toast.className = 'toast';
-        }, 3000);
-    }
+    // ✅ ATUALIZAR TEXTO DOS TOASTS
+function mostrarToast(mensagem, tipo = 'info') {
+    const toast = document.getElementById('toast');
+    
+    // ✅ MENSAGENS MAIS DESCRITIVAS
+    const mensagensPersonalizadas = {
+        'Extensão desabilitada - Nenhum alerta será disparado': '🔕 Extensão desabilitada - Alertas desativados',
+        'Extensão habilitada - Alertas ativados': '🔔 Extensão habilitada - Alertas ativados'
+    };
+    
+    toast.textContent = mensagensPersonalizadas[mensagem] || mensagem;
+    toast.className = `toast mostrar ${tipo}`;
+    
+    setTimeout(() => {
+        toast.className = 'toast';
+    }, 2000);
+}
 
     function criarItemLembrete(id, lembrete) {
         const item = document.createElement('li');
