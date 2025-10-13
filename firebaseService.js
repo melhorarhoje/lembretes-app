@@ -20,31 +20,27 @@ class FirebaseService {
             appId: "1:513840064003:web:641ce56ee2eb4858625036"
         };
 
-        try {
-            // ✅ VERIFICAR SE JÁ EXISTE APP E EVITAR DUPLICAÇÃO
-            if (!firebase.apps.length) {
-                firebase.initializeApp(configFirebase);
-                console.log('✅ Firebase inicializado com sucesso');
-            } else {
-                firebase.app(); // Usar app existente
-                console.log('✅ Firebase já estava inicializado');
-            }
-            
-            this.bancoDados = firebase.firestore();
-            this.inicializado = true;
-            
-            // ✅ CONFIGURAÇÕES DO FIRESTORE PARA MELHOR PERFORMANCE
-            this.bancoDados.settings({
-                cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
-            });
-            
-            // ✅ VERIFICAR CONEXÃO
-            this.verificarConexao();
-            
-        } catch (erro) {
-            console.error('❌ Erro ao inicializar Firebase:', erro);
-            this.inicializado = false;
+           try {
+        if (!firebase.apps.length) {
+            // ✅ TENTAR COM CONFIGURAÇÕES DE REDE ALTERNATIVAS
+            firebase.initializeApp(configFirebase);
         }
+        
+        this.bancoDados = firebase.firestore();
+        
+        // ✅ CONFIGURAÇÕES PARA AMBIENTES RESTRITIVOS
+        this.bancoDados.settings({
+            experimentalForceLongPolling: true, // ✅ PARA FIREWALLS RESTRITIVOS
+            merge: true
+        });
+        
+        this.inicializado = true;
+        console.log('✅ Firebase inicializado com configurações alternativas');
+        
+    } catch (erro) {
+        console.error('❌ Firebase não pode ser inicializado:', erro.message);
+        this.inicializado = false;
+    }
     }
 
     // ✅ VERIFICAR CONEXÃO COM FIREBASE
@@ -218,3 +214,4 @@ class FirebaseService {
 // ✅ INSTÂNCIA GLOBAL
 const firebaseService = new FirebaseService();
 module.exports = firebaseService;
+
