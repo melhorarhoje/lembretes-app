@@ -179,6 +179,20 @@ class FirebaseService {
         }
     }
 
+    // ✅ REINICIALIZAR FIREBASE
+reinicializar() {
+    try {
+        this.pararObservacao();
+        this.inicializado = false;
+        this.inicializar();
+        console.log('🔄 Firebase reinicializado');
+        return true;
+    } catch (erro) {
+        console.error('❌ Erro ao reinicializar Firebase:', erro);
+        return false;
+    }
+}
+
     converterDoFirebase(doc) {
         const dados = doc.data();
         return {

@@ -574,4 +574,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             minute: '2-digit'
         });
     }
+
+    // ✅ SINCRONIZAÇÃO MANUAL
+async function sincronizarManualmente() {
+    try {
+        mostrarToast('Sincronizando...', 'info');
+        await ipcRenderer.invoke('sincronizar-manualmente');
+        await carregarLembretes();
+        mostrarToast('Sincronização completa!', 'sucesso');
+    } catch (erro) {
+        console.error('Erro na sincronização manual:', erro);
+        mostrarToast('Erro na sincronização', 'erro');
+    }
+}
+
+// ✅ ESCUTAR ATUALIZAÇÕES DO BACKEND
+ipcRenderer.on('dados-atualizados', async () => {
+    console.log('📥 Dados atualizados recebidos do backend');
+    await carregarLembretes();
+    mostrarToast('Dados atualizados!', 'info');
+});
+
 });
