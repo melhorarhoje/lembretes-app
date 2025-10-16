@@ -58,6 +58,19 @@
       "mensagem": "Novo local pendente",
       "criadoEm": "2025-10-16T17:05:06.099Z",
       "sincronizado": false
+    },
+    "local_pessoal_1760635831341": {
+      "id": "local_pessoal_1760635831341",
+      "mensagem": "Nova nota pessoal",
+      "criadoEm": "2025-10-16T17:30:31.341Z",
+      "sincronizado": false,
+      "local": true
+    },
+    "local_pending_1760635831341": {
+      "id": "local_pending_1760635831341",
+      "mensagem": "Novo local pendente",
+      "criadoEm": "2025-10-16T17:30:31.341Z",
+      "sincronizado": false
     }
   },
   "configuracoes": {

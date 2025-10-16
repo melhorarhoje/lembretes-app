@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             abaCompi.classList.add('ativa');
             abaPessoal.classList.remove('ativa');
             document.querySelector('.titulo-painel').textContent = 'Painel de lembretes';
+            document.body.classList.remove('pessoal-active');
             await carregarLembretes();
         });
 
@@ -48,6 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             abaPessoal.classList.add('ativa');
             abaCompi.classList.remove('ativa');
             document.querySelector('.titulo-painel').textContent = 'Painel de lembretes';
+            document.body.classList.add('pessoal-active');
             await carregarLembretes();
         });
     // ✅ EVENT LISTENERS
@@ -239,12 +241,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const classeAlarme = temAlarme ? '' : 'sem-alarme';
         const sincronizado = lembrete.sincronizado !== false;
 
+        // decidir se mostramos icone de sync e badge pessoal (na aba Pessoal não devemos mostrar)
+        const mostrarBadgePessoal = (lembrete.local === true) && (abaAtual !== 'pessoal');
+        const mostrarIconeSync = !sincronizado && (abaAtual !== 'pessoal');
+
         item.innerHTML = `
             <div class="conteudo-lembrete">
                 <div class="texto-lembrete" data-id="${id}">
                     ${escapeHtml(lembrete.mensagem)}
-                    ${!sincronizado ? ' <i class="fas fa-cloud-upload-alt icone-sincronizacao" title="Aguardando sincronização"></i>' : ''}
-                    ${lembrete.local === true ? ' <span class="badge-pessoal">Pessoal</span>' : ''}
+                    ${mostrarIconeSync ? ' <i class="fas fa-cloud-upload-alt icone-sincronizacao" title="Aguardando sincronização"></i>' : ''}
+                    ${mostrarBadgePessoal ? ' <span class="badge-pessoal">Pessoal</span>' : ''}
                 </div>
                 <div class="info-alarme ${classeAlarme}">
                     <i class="fas fa-clock"></i>

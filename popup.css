@@ -1,6 +1,6 @@
 /* popup.css - VERSÃO COMPLETA COM SINCRONIZAÇÃO */
 body {
-  width: 500px;
+  width: 480px; /* largura que cabia anteriormente */
   font-family: Arial, sans-serif;
   background-color: #f4f4f9;
   margin: 0;
@@ -33,11 +33,24 @@ body {
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
+  color: #000; /* fonte preta por padrão */
 }
 
 .aba.ativa {
   background: white;
   border-color: #e5e7eb;
+  border-width: 2px; /* borda mais grossa quando ativa */
+  color: #000; /* manter fonte preta quando ativa */
+}
+
+.aba:hover {
+  background: #2563eb; /* cor atual de destaque */
+  color: #fff; /* fonte branca ao passar o cursor */
+}
+
+/* Quando a aba Pessoal estiver ativa, aplicar fundo azul suave no body */
+body.pessoal-active {
+  background-color: #e9f2ff;
 }
 
 .icones-cabecalho {
