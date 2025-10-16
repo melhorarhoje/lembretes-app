@@ -17,7 +17,7 @@
     "firebase",
     "electron"
   ],
-  "author": "Seu Nome <seu-email@exemplo.com>",
+  "author": "Seu Nome",
   "license": "MIT",
   "dependencies": {
     "firebase": "^9.23.0",
