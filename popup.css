@@ -1,6 +1,6 @@
 /* popup.css - VERSÃO COMPLETA COM SINCRONIZAÇÃO */
 body {
-  width: 480px; /* largura que cabia anteriormente */
+  width: 520px; /* largura aumentada para evitar corte de conteúdo */
   font-family: Arial, sans-serif;
   background-color: #f4f4f9;
   margin: 0;
@@ -44,7 +44,7 @@ body {
 }
 
 .aba:hover {
-  background: #2563eb; /* cor atual de destaque */
+  background: #1d4ed8; /* combinar com a cor do botão Inserir */
   color: #fff; /* fonte branca ao passar o cursor */
 }
 

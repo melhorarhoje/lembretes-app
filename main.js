@@ -329,7 +329,7 @@ const alarmesAtivos = new Map();
 
 function createMainWindow() {
     mainWindow = new BrowserWindow({
-        width: 480,
+        width: 520,
         height: 650,
         webPreferences: {
             nodeIntegration: true,
