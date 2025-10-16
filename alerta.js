@@ -116,12 +116,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.close();
     });
 
-    // Fechar automaticamente após 45 segundos (se não silenciado)
-    setTimeout(() => {
-        if (!botaoSilenciar.disabled) {
-            window.close();
-        }
-    }, 45000);
+    // NÃO FECHAR AUTOMATICAMENTE: manter a janela aberta até o usuário fechar
+    // (o comportamento anterior fechava após 45s; removido por solicitação)
 
     // Focar na janela
     window.focus();
