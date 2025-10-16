@@ -5,11 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
-    "build:win": "electron-builder --win portable",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux",
-    "dist": "electron-builder --dir"
+    "build": "electron-builder --win portable"
   },
   "keywords": [
     "compi",
@@ -20,9 +16,7 @@
   "author": "Seu Nome",
   "license": "MIT",
   "dependencies": {
-    "firebase": "^9.23.0",
-    "png2icons": "^2.0.1",
-    "sharp": "^0.34.4"
+    "firebase": "^9.23.0"
   },
   "devDependencies": {
     "electron": "^27.0.0",
@@ -35,19 +29,17 @@
       "output": "dist"
     },
     "files": [
-      "**/*"
+      "*.js",
+      "*.html",
+      "*.css",
+      "*.mp3",
+      "*.png",
+      "node_modules/firebase/**/*",
+      "!node_modules/**/*.{md,markdown,ts}",
+      "!dist"
     ],
     "win": {
-      "icon": "assets/icon.ico",
-      "target": ["nsis","portable"]
-    },
-    "mac": {
-      "icon": "assets/icon.icns",
-      "target": ["dmg","zip"]
-    },
-    "linux": {
-      "icon": "assets/icon.png",
-      "target": ["AppImage","deb"]
+      "target": "portable"
     }
   }
 }
