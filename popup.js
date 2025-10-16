@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ipcRenderer.on('dados-atualizados', async () => {
             console.log('🔄 Dados atualizados recebidos');
             await carregarLembretes();
-            mostrarToast('Dados atualizados de outros usuários', 'info');
+            mostrarToast('Dados atualizados', 'info');
         });
         let debounceAtualizacao;
         ipcRenderer.on('dados-atualizados', async (event, payload) => {
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 clearTimeout(debounceAtualizacao);
                 debounceAtualizacao = setTimeout(async () => {
                     await carregarLembretes();
-                    mostrarToast('Dados atualizados de outros usu\u00e1rios', 'info');
+                    mostrarToast('Dados atualizados', 'info');
                 }, 120);
 
                 return;
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Fallback genérico: recarregar
             await carregarLembretes();
-            mostrarToast('Dados atualizados de outros usu\u00e1rios', 'info');
+            mostrarToast('Dados atualizados', 'info');
         });
     }
 
