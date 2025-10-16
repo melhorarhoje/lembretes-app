@@ -1,0 +1,31 @@
+// firestore.rules - REGRAS PERMISSIVAS APENAS PARA TESTE
+// ATENÇÃO: não use em produção. Essas regras permitem leitura e escrita
+// para qualquer usuário autenticado ou não. Use apenas temporariamente para
+// depuração local.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Permite leitura/escrita na coleção de lembretes compartilhados
+    match /lembretesCompartilhados/{docId} {
+      allow read, write: if true;
+
+      rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /lembretesCompartilhados/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+
+
+
+    }
+
+    // Por segurança, negar tudo o mais explicitamente
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

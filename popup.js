@@ -58,6 +58,44 @@ document.addEventListener('DOMContentLoaded', async () => {
             await carregarLembretes();
             mostrarToast('Dados atualizados de outros usuários', 'info');
         });
+        let debounceAtualizacao;
+        ipcRenderer.on('dados-atualizados', async (event, payload) => {
+            console.log('🔔 dados-atualizados recebido', payload && (payload.mudancas ? `${payload.mudancas.length} mudanças` : payload.resumo ? 'snapshot' : 'sem-payload'));
+
+            // Se vierem mudanças incrementais, aplicamos localmente e atualizamos a UI rapidamente
+            if (payload && payload.mudancas && payload.mudancas.length > 0) {
+                for (const mudanca of payload.mudancas) {
+                    switch (mudanca.tipo) {
+                        case 'added':
+                        case 'modified':
+                            // atualizar item direto no DOM por simplicidade: recarregaremos a lista inteira
+                            break;
+                        case 'removed':
+                            break;
+                    }
+                }
+
+                // Debounce para agrupar atualizações rápidas
+                clearTimeout(debounceAtualizacao);
+                debounceAtualizacao = setTimeout(async () => {
+                    await carregarLembretes();
+                    mostrarToast('Dados atualizados de outros usu\u00e1rios', 'info');
+                }, 120);
+
+                return;
+            }
+
+            // Se vier um snapshot completo, recarregamos tudo
+            if (payload && payload.resumo) {
+                await carregarLembretes();
+                mostrarToast('Dados sincronizados a partir do servidor', 'info');
+                return;
+            }
+
+            // Fallback genérico: recarregar
+            await carregarLembretes();
+            mostrarToast('Dados atualizados de outros usu\u00e1rios', 'info');
+        });
     }
 
     // ✅ CARREGAR CONFIGURAÇÕES
@@ -520,57 +558,4 @@ document.addEventListener('DOMContentLoaded', async () => {
             minute: '2-digit'
         });
     }
-});
-
-// popup.js - APENAS ADICIONAR BOTÃO SINCRONIZAÇÃO
-// ... (TODO O CÓDIGO ANTERIOR PERMANECE IGUAL) ...
-
-// ✅ ADICIONAR ESTA FUNÇÃO NO FINAL DO ARQUIVO
-function adicionarBotaoSincronizacao() {
-    const iconesCabecalho = document.querySelector('.icones-cabecalho');
-    if (iconesCabecalho && !document.getElementById('sincronizar-manual')) {
-        const botaoSync = document.createElement('i');
-        botaoSync.id = 'sincronizar-manual';
-        botaoSync.className = 'fas fa-sync-alt';
-        botaoSync.title = 'Sincronizar manualmente';
-        botaoSync.style.cursor = 'pointer';
-        botaoSync.style.marginLeft = '10px';
-        
-        botaoSync.addEventListener('click', async () => {
-            try {
-                botaoSync.classList.add('girando');
-                mostrarToast('Sincronizando...', 'info');
-                
-                await ipcRenderer.invoke('sincronizar-manualmente');
-                await carregarLembretes();
-                
-                mostrarToast('Sincronização completa!', 'sucesso');
-            } catch (erro) {
-                console.error('Erro na sincronização:', erro);
-                mostrarToast('Erro na sincronização', 'erro');
-            } finally {
-                botaoSync.classList.remove('girando');
-            }
-        });
-        
-        iconesCabecalho.appendChild(botaoSync);
-    }
-}
-
-// ✅ ADICIONAR ESTE CSS NO ALERTA.CSS (no final do arquivo)
-/*
-.girando {
-    animation: girar 1s linear infinite;
-}
-
-@keyframes girar {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-*/
-
-// ✅ CHAMAR NO DOMCONTENTLOADED
-document.addEventListener('DOMContentLoaded', async () => {
-    await inicializarAplicacao();
-    adicionarBotaoSincronizacao(); // ← ADICIONAR ESTA LINHA
 });

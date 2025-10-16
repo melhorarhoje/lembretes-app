@@ -71,34 +71,30 @@ class SimpleStore {
     }
 }
 
-// ✅ GERENCIADOR HÍBRIDO DE DADOS - FOCADO EM SINCRONIZAÇÃO
+// ✅ GERENCIADOR HÍBRIDO DE DADOS
+// ✅ GERENCIADOR HÍBRIDO DE DADOS - CORRIGIDO
 class GerenciadorDados {
     constructor() {
         this.localStore = new SimpleStore();
         this.firebaseService = null;
         this.sincronizando = false;
-        this.ultimaSincronizacao = null;
+        this.observadorAtivo = false;
         this.inicializarFirebase();
     }
 
     inicializarFirebase() {
         try {
-            console.log('🔥 Inicializando Firebase para sincronização...');
+            // ✅ CARREGAR FIREBASE COM TRY/CATCH ROBUSTO
             this.firebaseService = require('./firebaseService.js');
-            
-            // Aguardar um pouco para inicialização completa
-            setTimeout(() => {
-                if (this.firebaseService && this.firebaseService.inicializado) {
-                    console.log('✅ Firebase inicializado - iniciando sincronização');
-                    this.iniciarSincronizacaoTempoReal();
-                    this.sincronizarDadosIniciais();
-                } else {
-                    console.log('⚠️ Firebase offline - modo local apenas');
-                }
-            }, 3000);
+            console.log('🔥 FirebaseService carregado, status:', this.firebaseService.inicializado);
+            // Não iniciamos observação aqui — aguardaremos a criação da janela principal
+            // para garantir que `mainWindow` exista quando recebermos eventos.
+            if (!this.firebaseService.inicializado) {
+                console.log('⚠️ Firebase não inicializado - modo local apenas');
+            }
             
         } catch (erro) {
-            console.log('❌ Firebase não disponível:', erro.message);
+            console.log('❌ Erro ao carregar FirebaseService:', erro.message);
             this.firebaseService = { 
                 inicializado: false,
                 getStatus: () => ({ inicializado: false, online: false })
@@ -106,182 +102,132 @@ class GerenciadorDados {
         }
     }
 
-    // ✅ SINCRONIZAÇÃO EM TEMPO REAL - CORRIGIDA
-    iniciarSincronizacaoTempoReal() {
+    iniciarObservacaoTempoReal() {
         if (!this.firebaseService || !this.firebaseService.inicializado) {
-            console.log('❌ Firebase não disponível para sincronização');
+            console.log('⚠️ Firebase offline - sem observação em tempo real');
             return;
         }
 
         try {
-            console.log('🔄 Iniciando sincronização em tempo real...');
-            
-            this.firebaseService.observarMudancas((mudancas) => {
-                console.log(`📥 ${mudancas.length} mudança(s) recebida(s) em tempo real`);
-                this.processarMudancasRemotas(mudancas);
+            // O observador agora envia um objeto { mudancas, resumo, metadata }
+            this.firebaseService.observarMudancas((payload) => {
+                this.processarMudancasFirebase(payload);
             });
-            
-            console.log('✅ Sincronização em tempo real ativa');
-            
+            this.observadorAtivo = true;
+            console.log('👂 Observando mudanças Firebase em tempo real');
         } catch (erro) {
-            console.error('❌ Erro na sincronização tempo real:', erro);
+            console.error('❌ Erro ao iniciar observação:', erro);
         }
     }
 
-    // ✅ SINCRONIZAR DADOS INICIAIS AO ABRIR APP
-    async sincronizarDadosIniciais() {
-        if (!this.firebaseService || !this.firebaseService.inicializado || this.sincronizando) {
+    // Espera um payload com { mudancas, resumo, metadata }
+    processarMudancasFirebase(payload) {
+        const mudancas = (payload && payload.mudancas) ? payload.mudancas : [];
+        const resumo = payload && payload.resumo ? payload.resumo : null;
+
+        // Se não houver mudanças incrementais, mas houver um resumo completo,
+        // sincronizamos o snapshot completo (útil ao conectar pela primeira vez).
+        if (mudancas.length === 0 && resumo) {
+            console.log('🔁 Recebido snapshot completo do Firebase - mesclando dados');
+
+            // Mesclar preservando lembretes locais (ids começando com local_)
+            for (const [id, lembrete] of Object.entries(resumo)) {
+                this.localStore.data.lembretes[id] = lembrete;
+            }
+
+            // Preservar itens locais não sincronizados
+            // (já existem no localStore)
+            this.localStore.salvarDados();
+
+            if (mainWindow) {
+                mainWindow.webContents.send('dados-atualizados', { resumo });
+            }
+
             return;
         }
 
-        try {
-            this.sincronizando = true;
-            console.log('🔄 Sincronizando dados iniciais...');
-            
-            const lembretesRemotos = await this.firebaseService.buscarLembretesCompartilhados();
-            let atualizou = false;
+        if (mudancas.length === 0) return;
 
-            // MESCLAGEM INTELIGENTE: Manter o mais recente
-            for (const [id, lembreteRemoto] of Object.entries(lembretesRemotos)) {
-                const lembreteLocal = this.localStore.data.lembretes[id];
-                
-                if (!lembreteLocal) {
-                    // Novo lembrete remoto - adicionar localmente
-                    this.localStore.data.lembretes[id] = lembreteRemoto;
-                    atualizou = true;
-                    console.log(`✅ Adicionado localmente: ${id}`);
-                } else {
-                    // Conflito: verificar qual é mais recente
-                    const tempoLocal = new Date(lembreteLocal.atualizadoEm || 0).getTime();
-                    const tempoRemoto = new Date(lembreteRemoto.atualizadoEm || 0).getTime();
-                    
-                    if (tempoRemoto > tempoLocal) {
-                        // Remoto é mais recente - atualizar local
-                        this.localStore.data.lembretes[id] = lembreteRemoto;
-                        atualizou = true;
-                        console.log(`✅ Atualizado localmente: ${id}`);
-                    }
-                }
-            }
-
-            if (atualizou) {
-                this.localStore.salvarDados();
-                this.notificarFrontend();
-                console.log('✅ Sincronização inicial completa');
-            }
-            
-        } catch (erro) {
-            console.log('⚠️ Erro na sincronização inicial:', erro.message);
-        } finally {
-            this.sincronizando = false;
-        }
-    }
-
-    // ✅ PROCESSAR MUDANÇAS RECEBIDAS DO FIREBASE
-    processarMudancasRemotas(mudancas) {
-        if (this.sincronizando || mudancas.length === 0) return;
-
+        console.log(`🔄 Processando ${mudancas.length} mudança(s) do Firebase`);
         let atualizou = false;
-        console.log(`🔄 Processando ${mudancas.length} mudança(s) remota(s)`);
-        
+
         for (const mudanca of mudancas) {
-            try {
-                switch (mudanca.tipo) {
-                    case 'added':
-                    case 'modified':
-                        if (mudanca.dados) {
-                            const id = mudanca.id;
-                            const lembreteLocal = this.localStore.data.lembretes[id];
-                            
-                            // SÓ ATUALIZAR SE O REMOTO FOR MAIS RECENTE
-                            if (!lembreteLocal || this.remotoEhMaisRecente(lembreteLocal, mudanca.dados)) {
-                                this.localStore.data.lembretes[id] = mudanca.dados;
-                                atualizou = true;
-                                console.log(`✅ ${mudanca.tipo === 'added' ? 'Adicionado' : 'Atualizado'} remotamente: ${id}`);
-                            }
-                        }
-                        break;
-                        
-                    case 'removed':
-                        if (this.localStore.data.lembretes[mudanca.id]) {
-                            delete this.localStore.data.lembretes[mudanca.id];
-                            atualizou = true;
-                            console.log(`🗑️ Removido remotamente: ${mudanca.id}`);
-                        }
-                        break;
-                }
-            } catch (erro) {
-                console.error(`❌ Erro processando mudança ${mudanca.id}:`, erro);
+            switch (mudanca.tipo) {
+                case 'added':
+                case 'modified':
+                    if (mudanca.dados) {
+                        this.localStore.data.lembretes[mudanca.id] = mudanca.dados;
+                        atualizou = true;
+                        console.log(`✅ ${mudanca.tipo === 'added' ? 'Adicionado' : 'Atualizado'} do Firebase: ${String(mudanca.dados.mensagem).substring(0, 30)}...`);
+                    }
+                    break;
+
+                case 'removed':
+                    if (this.localStore.data.lembretes[mudanca.id]) {
+                        delete this.localStore.data.lembretes[mudanca.id];
+                        atualizou = true;
+                        console.log(`🗑️ Removido do Firebase: ${mudanca.id}`);
+                    }
+                    break;
             }
         }
-        
+
         if (atualizou) {
             this.localStore.salvarDados();
-            this.notificarFrontend();
-            console.log('✅ Mudanças remotas aplicadas localmente');
+
+            // NOTIFICAR FRONTEND: enviamos também as mudanças para evitar
+            // que o renderer precise fazer fetch completo.
+            if (mainWindow) {
+                mainWindow.webContents.send('dados-atualizados', { mudancas });
+            }
         }
     }
 
-    // ✅ VERIFICAR SE DADO REMOTO É MAIS RECENTE
-    remotoEhMaisRecente(local, remoto) {
-        try {
-            const tempoLocal = new Date(local.atualizadoEm || local.criadoEm || 0).getTime();
-            const tempoRemoto = new Date(remoto.atualizadoEm || remoto.criadoEm || 0).getTime();
-            return tempoRemoto > tempoLocal;
-        } catch (erro) {
-            console.error('❌ Erro comparando timestamps:', erro);
-            return false;
-        }
-    }
-
-    // ✅ SALVAR LEMBRETE (LOCAL + SINCRONIZAR)
+    // ✅ SALVAR LEMBRETE (HÍBRIDO) - CORRIGIDO
     async salvarLembrete(lembrete) {
-        console.log('💾 Salvando lembrete:', lembrete.mensagem?.substring(0, 30));
-        
-        // 1. SALVAR LOCALMENTE (INSTANTÂNEO)
+        // ✅ PRIMEIRO SALVA LOCALMENTE (RÁPIDO)
         const idLocal = this.localStore.salvarLembreteLocal(lembrete);
-        
-        // 2. SINCRONIZAR COM FIREBASE (BACKGROUND)
+        console.log(`💾 Salvo localmente: ${lembrete.mensagem.substring(0, 30)}...`);
+
+        // ✅ DEPOIS TENTA SINCRONIZAR COM FIREBASE (BACKGROUND)
         if (this.firebaseService && this.firebaseService.inicializado) {
-            this.sincronizarLembreteComFirebase(idLocal);
+            this.sincronizarComFirebaseEmBackground(idLocal);
         }
 
         return idLocal;
     }
 
-    // ✅ SINCRONIZAR LEMBRETE INDIVIDUAL
-    async sincronizarLembreteComFirebase(idLocal) {
-        if (this.sincronizando) return;
-        
+    // ✅ SINCRONIZAÇÃO EM BACKGROUND (NÃO BLOQUEIA INTERFACE)
+    async sincronizarComFirebaseEmBackground(idLocal) {
         try {
             this.sincronizando = true;
             const lembreteLocal = this.localStore.data.lembretes[idLocal];
             
-            if (!lembreteLocal) {
-                console.log('⚠️ Lembrete local não encontrado para sincronização');
-                return;
-            }
-
             const idFirebase = await this.firebaseService.salvarLembreteCompartilhado(lembreteLocal);
             
-            // Atualizar ID se necessário (de local para Firebase)
+            // ✅ ATUALIZAR ID LOCAL COM ID DO FIREBASE
             if (idFirebase !== idLocal) {
+                delete this.localStore.data.lembretes[idLocal];
                 this.localStore.data.lembretes[idFirebase] = {
                     ...lembreteLocal,
                     id: idFirebase,
                     sincronizado: true
                 };
-                delete this.localStore.data.lembretes[idLocal];
-                console.log(`🔄 ID atualizado: ${idLocal} → ${idFirebase}`);
+                console.log(`🔄 Sincronizado: ${idLocal} → ${idFirebase}`);
             } else {
                 this.localStore.data.lembretes[idLocal].sincronizado = true;
+                console.log(`✅ Sincronizado com Firebase: ${idLocal}`);
             }
             
             this.localStore.salvarDados();
-            console.log(`✅ Lembrete sincronizado: ${idFirebase}`);
+            
+            // ✅ NOTIFICAR ATUALIZAÇÃO
+            if (mainWindow) {
+                mainWindow.webContents.send('dados-atualizados');
+            }
             
         } catch (erroFirebase) {
-            console.log('⚠️ Firebase offline - mantendo local:', erroFirebase.message);
+            console.log('⚠️ Firebase offline - mantendo apenas local');
             this.localStore.data.lembretes[idLocal].sincronizado = false;
             this.localStore.salvarDados();
         } finally {
@@ -289,54 +235,59 @@ class GerenciadorDados {
         }
     }
 
-    // ✅ CARREGAR LEMBRETES (SEM ALTERAÇÕES)
+    // ✅ CARREGAR LEMBRETES (HÍBRIDO) - CORRIGIDO
     async carregarLembretes() {
-        console.log('📥 Carregando lembretes locais...');
+        // ✅ PRIMEIRO TENTA FIREBASE (SE ESTIVER ONLINE)
+        if (this.firebaseService && this.firebaseService.inicializado && !this.sincronizando) {
+            try {
+                this.sincronizando = true;
+                console.log('🔄 Tentando carregar do Firebase...');
+                
+                const lembretesFirebase = await this.firebaseService.buscarLembretesCompartilhados();
+                
+                // ✅ MESCLAR COM DADOS LOCAIS (MANTÉM LOCAIS NÃO SINCRONIZADOS)
+                const lembretesMesclados = { ...lembretesFirebase };
+                
+                // ✅ ADICIONAR LEMBRETES LOCAIS NÃO SINCRONIZADOS
+                for (const [id, lembrete] of Object.entries(this.localStore.data.lembretes)) {
+                    if (id.startsWith('local_') || !lembretesFirebase[id]) {
+                        lembretesMesclados[id] = lembrete;
+                    }
+                }
+                
+                this.localStore.data.lembretes = lembretesMesclados;
+                this.localStore.salvarDados();
+                
+                console.log(`✅ Dados sincronizados: ${Object.keys(lembretesMesclados).length} itens`);
+                return lembretesMesclados;
+                
+            } catch (erroFirebase) {
+                console.log('⚠️ Firebase offline - usando dados locais');
+            } finally {
+                this.sincronizando = false;
+            }
+        }
+        
+        // ✅ FALLBACK: DADOS LOCAIS
+        console.log(`📁 Usando dados locais: ${Object.keys(this.localStore.data.lembretes).length} itens`);
         return this.localStore.data.lembretes;
     }
 
-    // ✅ EXCLUIR LEMBRETE (LOCAL + REMOTO)
+    // ✅ EXCLUIR LEMBRETE (HÍBRIDO)
     async excluirLembrete(id) {
-        console.log('🗑️ Excluindo lembrete:', id);
         const excluidoLocal = this.localStore.excluirLembreteLocal(id);
         
-        // Tentar excluir do Firebase também
+        // ✅ TENTAR EXCLUIR DO FIREBASE
         if (excluidoLocal && this.firebaseService && this.firebaseService.inicializado && !id.startsWith('local_')) {
             try {
                 await this.firebaseService.excluirLembreteCompartilhado(id);
                 console.log(`✅ Excluído do Firebase: ${id}`);
             } catch (erroFirebase) {
-                console.log('⚠️ Não foi possível excluir do Firebase:', erroFirebase.message);
+                console.log('⚠️ Não foi possível excluir do Firebase - apenas local');
             }
         }
         
         return excluidoLocal;
-    }
-
-    // ✅ NOTIFICAR FRONTEND SOBRE ATUALIZAÇÕES
-    notificarFrontend() {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('dados-atualizados');
-            console.log('📢 Frontend notificado sobre atualizações');
-        }
-    }
-
-    // ✅ SINCRONIZAÇÃO MANUAL
-    async sincronizarManualmente() {
-        if (!this.firebaseService || !this.firebaseService.inicializado) {
-            console.log('❌ Firebase não disponível para sincronização manual');
-            return false;
-        }
-
-        try {
-            console.log('🔄 Sincronização manual iniciada...');
-            await this.sincronizarDadosIniciais();
-            console.log('✅ Sincronização manual concluída');
-            return true;
-        } catch (erro) {
-            console.error('❌ Erro na sincronização manual:', erro);
-            return false;
-        }
     }
 
     getStatus() {
@@ -345,7 +296,8 @@ class GerenciadorDados {
         return {
             firebase: statusFirebase,
             local: { 
-                itens: Object.keys(this.localStore.data.lembretes).length
+                itens: Object.keys(this.localStore.data.lembretes).length,
+                sincronizados: Object.values(this.localStore.data.lembretes).filter(l => l.sincronizado).length
             },
             sincronizando: this.sincronizando
         };
@@ -374,6 +326,16 @@ function createMainWindow() {
 
     mainWindow.loadFile('index.html');
     Menu.setApplicationMenu(null);
+    
+    // Iniciar observação após a janela principal ser criada para garantir
+    // que eventos enviados ao renderer sejam entregues.
+    setTimeout(() => {
+        try {
+            gerenciadorDados.iniciarObservacaoTempoReal();
+        } catch (e) {
+            console.log('⚠️ Falha ao iniciar observação após criar janela:', e.message);
+        }
+    }, 300);
 }
 
 function createAlertaWindow(lembreteId) {
