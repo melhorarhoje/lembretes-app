@@ -1,428 +1,576 @@
-// popup.js - CORRIGIDO E SIMPLIFICADO
+// popup.js - VERSÃO COMPLETA COM SINCRONIZAÇÃO
 const { ipcRenderer } = require('electron');
 
-let lembretes = {};
-let editandoId = null;
-
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 Iniciando aplicação...');
-    await inicializarAplicacao();
-});
-
-async function inicializarAplicacao() {
-    try {
-        // Carregar configurações
-        const configuracoes = await ipcRenderer.invoke('carregar-configuracoes');
-        atualizarIconesCabecalho(configuracoes);
-        
-        // Carregar lembretes
-        await carregarLembretes();
-        
-        // Configurar event listeners
-        configurarEventListeners();
-        
-        console.log('✅ Aplicação inicializada com sucesso');
-        
-    } catch (erro) {
-        console.error('❌ Erro ao inicializar aplicação:', erro);
-        mostrarToast('Erro ao carregar aplicação', 'erro');
-    }
-}
-
-async function carregarLembretes() {
-    try {
-        console.log('📥 Carregando lembretes...');
-        lembretes = await ipcRenderer.invoke('carregar-lembretes');
-        console.log(`✅ ${Object.keys(lembretes).length} lembretes carregados`);
-        renderizarLembretes();
-        atualizarStatusSincronizacao();
-        
-    } catch (erro) {
-        console.error('❌ Erro ao carregar lembretes:', erro);
-        mostrarToast('Erro ao carregar lembretes', 'erro');
-    }
-}
-
-function renderizarLembretes() {
-    const lista = document.getElementById('lista-lembretes');
-    if (!lista) {
-        console.error('❌ Elemento lista-lembretes não encontrado');
-        return;
-    }
-
-    lista.innerHTML = '';
-
-    const lembretesArray = Object.values(lembretes);
-    
-    if (lembretesArray.length === 0) {
-        lista.innerHTML = '<li class="sem-lembretes">Nenhum lembrete cadastrado</li>';
-        return;
-    }
-
-    // Ordenar por data de atualização (mais recentes primeiro)
-    lembretesArray.sort((a, b) => new Date(b.atualizadoEm) - new Date(a.atualizadoEm));
-
-    lembretesArray.forEach(lembrete => {
-        const item = criarElementoLembrete(lembrete);
-        lista.appendChild(item);
-    });
-}
-
-function criarElementoLembrete(lembrete) {
-    const li = document.createElement('li');
-    li.className = 'item-lembrete';
-    if (lembrete.dataHora) {
-        li.classList.add('com-alarme');
-    }
-
-    const agora = new Date();
-    const dataHora = lembrete.dataHora ? new Date(lembrete.dataHora) : null;
-    const alarmePassado = dataHora && dataHora < agora;
-
-    li.innerHTML = `
-        <div class="conteudo-lembrete">
-            <div class="texto-lembrete">${escapeHtml(lembrete.mensagem)}</div>
-            <div class="controles-lembrete">
-                <button class="btn-editar" data-id="${lembrete.id}" title="Editar">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn-alarme ${lembrete.dataHora ? 'ativo' : ''}" data-id="${lembrete.id}" title="${lembrete.dataHora ? 'Alterar Alarme' : 'Configurar Alarme'}">
-                    <i class="fas ${lembrete.dataHora ? 'fa-bell' : 'fa-bell-slash'}"></i>
-                </button>
-                <button class="btn-som ${lembrete.somHabilitado ? 'ativo' : ''}" data-id="${lembrete.id}" title="${lembrete.somHabilitado ? 'Desativar Som' : 'Ativar Som'}">
-                    <i class="fas ${lembrete.somHabilitado ? 'fa-volume-up' : 'fa-volume-mute'}"></i>
-                </button>
-                <button class="btn-excluir" data-id="${lembrete.id}" title="Excluir">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        </div>
-        ${lembrete.dataHora ? `
-            <div class="info-alarme ${alarmePassado ? 'passado' : ''}">
-                <i class="fas fa-clock"></i>
-                ${formatarDataHora(lembrete.dataHora)}
-                ${alarmePassado ? ' (Passado)' : ''}
-            </div>
-        ` : ''}
-        ${lembrete.sincronizado ? '<div class="status-sincronizado"><i class="fas fa-cloud"></i></div>' : ''}
-    `;
-
-    return li;
-}
-
-function configurarEventListeners() {
-    // Botão adicionar lembrete
-    const btnAdicionar = document.getElementById('adicionar-lembrete');
     const entradaLembrete = document.getElementById('entrada-lembrete');
-
-    btnAdicionar.addEventListener('click', adicionarLembrete);
-    entradaLembrete.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            adicionarLembrete();
-        }
-    });
-
-    // Botões do cabeçalho
-    document.getElementById('alternar-extensao').addEventListener('click', alternarExtensao);
-    document.getElementById('alternar-som-global').addEventListener('click', alternarSomGlobal);
-
-    // Modal de data/hora
-    const modal = document.getElementById('modal-datahora');
-    const fecharModal = document.querySelector('.fechar-modal');
+    const btnAdicionar = document.getElementById('adicionar-lembrete');
+    const lista = document.getElementById('lista-lembretes');
+    const alternarExtensao = document.getElementById('alternar-extensao');
+    const alternarSom = document.getElementById('alternar-som-global');
+    const statusSincronizacao = document.getElementById('status-sincronizacao');
+    const modalDataHora = document.getElementById('modal-datahora');
+    const textoLembreteModal = document.getElementById('texto-lembrete-modal');
+    const dataAlarme = document.getElementById('data-alarme');
+    const horaAlarme = document.getElementById('hora-alarme');
     const btnSalvarAlarme = document.getElementById('btn-salvar-alarme');
     const btnRemoverAlarme = document.getElementById('btn-remover-alarme');
+    const fecharModal = document.querySelector('.fechar-modal');
 
-    fecharModal.addEventListener('click', () => modal.style.display = 'none');
-    btnSalvarAlarme.addEventListener('click', salvarAlarme);
-    btnRemoverAlarme.addEventListener('click', removerAlarme);
+    let lembreteEditandoId = null;
+    let extensaoHabilitada = true;
+    let somGlobalHabilitado = true;
+    let sincronizacaoAtiva = false;
 
-    // Fechar modal clicando fora
-    window.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.style.display = 'none';
-        }
-    });
-
-    // Event delegation para botões dinâmicos
-    document.getElementById('lista-lembretes').addEventListener('click', (e) => {
-        const id = e.target.closest('button')?.dataset.id;
-        if (!id) return;
-
-        if (e.target.closest('.btn-editar')) {
-            editarLembrete(id);
-        } else if (e.target.closest('.btn-alarme')) {
-            configurarAlarme(id);
-        } else if (e.target.closest('.btn-som')) {
-            alternarSomLembrete(id);
-        } else if (e.target.closest('.btn-excluir')) {
-            excluirLembrete(id);
-        }
-    });
-
-    // Escutar atualizações do backend
-    ipcRenderer.on('dados-atualizados', async () => {
-        console.log('📥 Recebida atualização de dados');
-        await carregarLembretes();
-        mostrarToast('Dados atualizados!', 'info');
-    });
-}
-
-async function adicionarLembrete() {
-    const entrada = document.getElementById('entrada-lembrete');
-    const texto = entrada.value.trim();
-
-    if (!texto) {
-        mostrarToast('Digite um lembrete', 'aviso');
-        return;
-    }
-
-    try {
-        const id = await ipcRenderer.invoke('adicionar-lembrete', { mensagem: texto });
-        console.log('✅ Lembrete adicionado:', id);
-        
-        entrada.value = '';
-        await carregarLembretes();
-        mostrarToast('Lembrete adicionado!', 'sucesso');
-        
-    } catch (erro) {
-        console.error('❌ Erro ao adicionar lembrete:', erro);
-        mostrarToast('Erro ao adicionar lembrete', 'erro');
-    }
-}
-
-function editarLembrete(id) {
-    const lembrete = lembretes[id];
-    if (!lembrete) return;
-
-    const novoTexto = prompt('Editar lembrete:', lembrete.mensagem);
-    if (novoTexto !== null && novoTexto.trim() !== '' && novoTexto !== lembrete.mensagem) {
-        ipcRenderer.invoke('atualizar-texto-lembrete', id, novoTexto.trim())
-            .then(() => {
-                carregarLembretes();
-                mostrarToast('Lembrete atualizado!', 'sucesso');
-            })
-            .catch(erro => {
-                console.error('Erro ao atualizar lembrete:', erro);
-                mostrarToast('Erro ao atualizar lembrete', 'erro');
-            });
-    }
-}
-
-function configurarAlarme(id) {
-    const lembrete = lembretes[id];
-    if (!lembrete) return;
-
-    editandoId = id;
-    const modal = document.getElementById('modal-datahora');
-    const textoModal = document.getElementById('texto-lembrete-modal');
-    const dataInput = document.getElementById('data-alarme');
-    const horaInput = document.getElementById('hora-alarme');
-
-    textoModal.textContent = `"${lembrete.mensagem}"`;
-    
-    // Configurar data mínima como hoje
+    // ✅ CONFIGURAR DATA MÍNIMA
     const hoje = new Date().toISOString().split('T')[0];
-    dataInput.min = hoje;
+    dataAlarme.min = hoje;
 
-    if (lembrete.dataHora) {
-        const dataHora = new Date(lembrete.dataHora);
-        dataInput.value = dataHora.toISOString().split('T')[0];
-        horaInput.value = dataHora.toTimeString().slice(0, 5);
-    } else {
-        dataInput.value = '';
-        horaInput.value = '';
+    // ✅ INICIALIZAR
+    await carregarConfiguracoes();
+    await carregarLembretes();
+    iniciarOuvinteSincronizacao();
+
+    // ✅ EVENT LISTENERS
+    btnAdicionar.addEventListener('click', adicionarLembrete);
+    entradaLembrete.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') adicionarLembrete();
+    });
+
+    alternarExtensao.addEventListener('click', alternarExtensaoHandler);
+    alternarSom.addEventListener('click', alternarSomHandler);
+
+    // ✅ MODAL EVENTS
+    fecharModal.addEventListener('click', fecharModalHandler);
+    btnSalvarAlarme.addEventListener('click', salvarAlarmeHandler);
+    btnRemoverAlarme.addEventListener('click', removerAlarmeHandler);
+
+    // ✅ FECHAR MODAL AO CLICAR FORA
+    window.addEventListener('click', (e) => {
+        if (e.target === modalDataHora) {
+            fecharModalHandler();
+        }
+    });
+
+    // ✅ OUVIR ATUALIZAÇÕES EM TEMPO REAL
+    function iniciarOuvinteSincronizacao() {
+        ipcRenderer.on('dados-atualizados', async () => {
+            console.log('🔄 Dados atualizados recebidos');
+            await carregarLembretes();
+            mostrarToast('Dados atualizados de outros usuários', 'info');
+        });
     }
 
-    modal.style.display = 'block';
-}
-
-async function salvarAlarme() {
-    if (!editandoId) return;
-
-    const dataInput = document.getElementById('data-alarme').value;
-    const horaInput = document.getElementById('hora-alarme').value;
-
-    if (!dataInput || !horaInput) {
-        mostrarToast('Selecione data e hora', 'aviso');
-        return;
+    // ✅ CARREGAR CONFIGURAÇÕES
+    async function carregarConfiguracoes() {
+        try {
+            const configuracoes = await ipcRenderer.invoke('carregar-configuracoes');
+            extensaoHabilitada = configuracoes.extensaoHabilitada !== false;
+            somGlobalHabilitado = configuracoes.somGlobalHabilitado !== false;
+            await atualizarStatusSincronizacao();
+            atualizarIcones();
+        } catch (erro) {
+            console.error('Erro ao carregar configurações:', erro);
+            mostrarToast('Erro ao carregar configurações', 'erro');
+        }
     }
 
-    const dataHora = new Date(`${dataInput}T${horaInput}`);
-    const agora = new Date();
+    // ✅ ATUALIZAR STATUS DA SINCRONIZAÇÃO
+    async function atualizarStatusSincronizacao() {
+        try {
+            const status = await ipcRenderer.invoke('get-status-sincronizacao');
+            
+            if (status.firebase.inicializado && status.firebase.online) {
+                statusSincronizacao.className = 'fas fa-cloud sincronizado';
+                statusSincronizacao.title = `Sincronizado - ${status.local.itens} itens`;
+                sincronizacaoAtiva = true;
+            } else if (status.firebase.inicializado && !status.firebase.online) {
+                statusSincronizacao.className = 'fas fa-cloud sincronizando';
+                statusSincronizacao.title = 'Conectando...';
+                sincronizacaoAtiva = false;
+            } else {
+                statusSincronizacao.className = 'fas fa-cloud erro';
+                statusSincronizacao.title = 'Modo local apenas';
+                sincronizacaoAtiva = false;
+            }
 
-    if (dataHora <= agora) {
-        mostrarToast('Selecione uma data/hora futura', 'aviso');
-        return;
+            // ✅ ADICIONAR CLIQUE PARA SINCRONIZAÇÃO MANUAL
+            statusSincronizacao.style.cursor = 'pointer';
+            statusSincronizacao.onclick = async () => {
+                if (!sincronizacaoAtiva) {
+                    statusSincronizacao.className = 'fas fa-cloud sincronizando';
+                    statusSincronizacao.title = 'Sincronizando...';
+                    
+                    ipcRenderer.send('sincronizar-manualmente');
+                    
+                    ipcRenderer.once('sincronizacao-completa', async () => {
+                        await carregarLembretes();
+                        await atualizarStatusSincronizacao();
+                        mostrarToast('Sincronização completa', 'sucesso');
+                    });
+
+                    setTimeout(async () => {
+                        await atualizarStatusSincronizacao();
+                    }, 3000);
+                }
+            };
+
+        } catch (erro) {
+            console.error('Erro ao verificar status:', erro);
+            statusSincronizacao.className = 'fas fa-cloud erro';
+            statusSincronizacao.title = 'Erro ao verificar status';
+        }
     }
 
-    try {
-        await ipcRenderer.invoke('configurar-alarme', editandoId, dataHora.toISOString());
-        document.getElementById('modal-datahora').style.display = 'none';
-        await carregarLembretes();
-        mostrarToast('Alarme configurado!', 'sucesso');
+    // ✅ ATUALIZAR ÍCONES
+    function atualizarIcones() {
+        alternarExtensao.className = extensaoHabilitada ? 
+            'fas fa-power-off' : 'fas fa-power-off desabilitado';
+        alternarSom.className = somGlobalHabilitado ? 
+            'fas fa-volume-up' : 'fas fa-volume-mute';
+    }
+
+    // ✅ CARREGAR LEMBRETES
+    async function carregarLembretes() {
+        try {
+            const lembretes = await ipcRenderer.invoke('carregar-lembretes');
+            
+            lista.innerHTML = '';
+            
+            const lembretesOrdenados = Object.entries(lembretes)
+                .sort(([,a], [,b]) => new Date(b.criadoEm) - new Date(a.criadoEm));
+            
+            if (lembretesOrdenados.length === 0) {
+                lista.innerHTML = '<li class="item-vazio">Nenhum lembrete ainda. Adicione o primeiro!</li>';
+                return;
+            }
+            
+            lembretesOrdenados.forEach(([id, lembrete]) => {
+                const item = criarItemLembrete(id, lembrete);
+                lista.appendChild(item);
+            });
+
+            await atualizarStatusSincronizacao();
+
+        } catch (erro) {
+            console.error('Erro ao carregar lembretes:', erro);
+            mostrarToast('Erro ao carregar lembretes', 'erro');
+        }
+    }
+
+    // ✅ CRIAR ITEM DE LEMBRETE
+    function criarItemLembrete(id, lembrete) {
+        const item = document.createElement('li');
+        item.className = 'item-lembrete';
         
-    } catch (erro) {
-        console.error('Erro ao configurar alarme:', erro);
-        mostrarToast('Erro ao configurar alarme', 'erro');
-    }
-}
-
-async function removerAlarme() {
-    if (!editandoId) return;
-
-    try {
-        await ipcRenderer.invoke('remover-alarme', editandoId);
-        document.getElementById('modal-datahora').style.display = 'none';
-        await carregarLembretes();
-        mostrarToast('Alarme removido!', 'sucesso');
+        const temAlarme = lembrete.dataHora && new Date(lembrete.dataHora) > new Date();
+        const textoData = temAlarme ? 
+            formatarData(lembrete.dataHora) : 
+            'Sem alarme';
         
-    } catch (erro) {
-        console.error('Erro ao remover alarme:', erro);
-        mostrarToast('Erro ao remover alarme', 'erro');
-    }
-}
+        const classeAlarme = temAlarme ? '' : 'sem-alarme';
+        const sincronizado = lembrete.sincronizado !== false;
 
-async function alternarSomLembrete(id) {
-    try {
-        await ipcRenderer.invoke('alternar-som-lembrete', id);
-        await carregarLembretes();
-        mostrarToast('Som do lembrete alterado!', 'info');
+        item.innerHTML = `
+            <div class="conteudo-lembrete">
+                <div class="texto-lembrete" data-id="${id}">
+                    ${escapeHtml(lembrete.mensagem)}
+                    ${!sincronizado ? ' <i class="fas fa-cloud-upload-alt icone-sincronizacao" title="Aguardando sincronização"></i>' : ''}
+                </div>
+                <div class="info-alarme ${classeAlarme}">
+                    <i class="fas fa-clock"></i>
+                    <span>${textoData}</span>
+                    ${sincronizado ? ' <i class="fas fa-cloud icone-cloud" title="Sincronizado"></i>' : ' <i class="fas fa-laptop icone-local" title="Apenas local"></i>'}
+                </div>
+            </div>
+            <div class="acoes-lembrete">
+                <i class="fas fa-edit" data-id="${id}" title="Editar lembrete"></i>
+                <i class="fas fa-calendar" data-id="${id}" title="Configurar alarme"></i>
+                <i class="fas fa-bell${lembrete.somHabilitado ? '' : '-slash'}" 
+                   data-id="${id}" 
+                   title="${lembrete.somHabilitado ? 'Desabilitar som' : 'Habilitar som'}"></i>
+                <i class="fas fa-trash" data-id="${id}" title="Excluir lembrete"></i>
+            </div>
+        `;
+
+        // ✅ EVENT LISTENERS
+        const textoElement = item.querySelector('.texto-lembrete');
+        if (textoElement) {
+            textoElement.addEventListener('click', (e) => {
+                e.stopPropagation();
+                iniciarEdicaoTexto(e.currentTarget, id, lembrete.mensagem);
+            });
+        }
+
+        const iconeCalendario = item.querySelector('.fa-calendar');
+        if (iconeCalendario) {
+            iconeCalendario.addEventListener('click', (e) => {
+                e.stopPropagation();
+                abrirModalConfigurarAlarme(id, lembrete.mensagem, lembrete.dataHora);
+            });
+        }
+
+        const iconeLixeira = item.querySelector('.fa-trash');
+        if (iconeLixeira) {
+            iconeLixeira.addEventListener('click', (e) => {
+                e.stopPropagation();
+                excluirLembrete(id);
+            });
+        }
+
+        const iconeSom = item.querySelector('.fa-bell, .fa-bell-slash');
+        if (iconeSom) {
+            iconeSom.addEventListener('click', (e) => {
+                e.stopPropagation();
+                alternarSomLembrete(id);
+            });
+        }
+
+        const iconeEditar = item.querySelector('.fa-edit');
+        if (iconeEditar) {
+            iconeEditar.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (textoElement) {
+                    textoElement.click();
+                }
+            });
+        }
+
+        return item;
+    }
+
+    // ✅ INICIAR EDIÇÃO DE TEXTO
+    function iniciarEdicaoTexto(elemento, id, textoAtual) {
+        if (!elemento || !elemento.parentNode) {
+            console.error('Elemento ou parentNode não encontrado');
+            return;
+        }
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = textoAtual;
+        input.className = 'texto-lembrete-editando';
+        input.style.cssText = `
+            width: 100%;
+            border: 2px solid #2563eb;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 14px;
+            font-family: inherit;
+            background: white;
+            box-sizing: border-box;
+        `;
+
+        elemento.parentNode.replaceChild(input, elemento);
+        input.focus();
+        input.select();
+
+        const salvarEdicao = () => {
+            const novoTexto = input.value.trim();
+            
+            if (!input.parentNode) {
+                console.error('ParentNode não encontrado ao salvar edição');
+                return;
+            }
+
+            const novoElementoTexto = document.createElement('div');
+            novoElementoTexto.className = 'texto-lembrete';
+            novoElementoTexto.textContent = novoTexto || textoAtual;
+            novoElementoTexto.setAttribute('data-id', id);
+            
+            novoElementoTexto.addEventListener('click', (e) => {
+                e.stopPropagation();
+                iniciarEdicaoTexto(e.target, id, novoTexto || textoAtual);
+            });
+            
+            input.parentNode.replaceChild(novoElementoTexto, input);
+
+            if (novoTexto && novoTexto !== textoAtual) {
+                atualizarTextoLembrete(id, novoTexto);
+            }
+        };
+
+        const cancelarEdicao = () => {
+            if (!input.parentNode) return;
+            
+            const novoElementoTexto = document.createElement('div');
+            novoElementoTexto.className = 'texto-lembrete';
+            novoElementoTexto.textContent = textoAtual;
+            novoElementoTexto.setAttribute('data-id', id);
+            novoElementoTexto.addEventListener('click', (e) => {
+                e.stopPropagation();
+                iniciarEdicaoTexto(e.target, id, textoAtual);
+            });
+            
+            input.parentNode.replaceChild(novoElementoTexto, input);
+        };
+
+        input.addEventListener('blur', salvarEdicao);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                salvarEdicao();
+            } else if (e.key === 'Escape') {
+                cancelarEdicao();
+            }
+        });
+
+        input.addEventListener('click', (e) => e.stopPropagation());
+    }
+
+    // ✅ ABRIR MODAL CONFIGURAR ALARME
+    function abrirModalConfigurarAlarme(id, mensagem, dataHora) {
+        lembreteEditandoId = id;
+        textoLembreteModal.textContent = mensagem;
         
-    } catch (erro) {
-        console.error('Erro ao alternar som:', erro);
-        mostrarToast('Erro ao alterar som', 'erro');
+        if (dataHora) {
+            const data = new Date(dataHora);
+            dataAlarme.value = data.toISOString().split('T')[0];
+            horaAlarme.value = data.toTimeString().slice(0, 5);
+        } else {
+            dataAlarme.value = '';
+            horaAlarme.value = '';
+        }
+
+        modalDataHora.style.display = 'block';
     }
-}
 
-async function excluirLembrete(id) {
-    const lembrete = lembretes[id];
-    if (!lembrete) return;
+    function fecharModalHandler() {
+        modalDataHora.style.display = 'none';
+        lembreteEditandoId = null;
+    }
 
-    if (confirm(`Excluir o lembrete "${lembrete.mensagem}"?`)) {
+    // ✅ ADICIONAR LEMBRETE
+    async function adicionarLembrete() {
+        const mensagem = entradaLembrete.value.trim();
+        if (!mensagem) {
+            mostrarToast('Digite um lembrete', 'erro');
+            return;
+        }
+
+        try {
+            const lembrete = {
+                mensagem: mensagem,
+                dataHora: null,
+                somHabilitado: true,
+                criadoEm: new Date().toISOString(),
+                atualizadoEm: new Date().toISOString()
+            };
+
+            await ipcRenderer.invoke('adicionar-lembrete', lembrete);
+
+            entradaLembrete.value = '';
+            mostrarToast('Lembrete adicionado', 'sucesso');
+            await carregarLembretes();
+            
+        } catch (erro) {
+            console.error('Erro ao adicionar lembrete:', erro);
+            mostrarToast('Erro ao adicionar lembrete', 'erro');
+        }
+    }
+
+    // ✅ ATUALIZAR TEXTO LEMBRETE
+    async function atualizarTextoLembrete(id, novoTexto) {
+        try {
+            await ipcRenderer.invoke('atualizar-texto-lembrete', id, novoTexto);
+            mostrarToast('Lembrete atualizado', 'sucesso');
+            await carregarLembretes();
+        } catch (erro) {
+            console.error('Erro ao atualizar lembrete:', erro);
+            mostrarToast('Erro ao atualizar lembrete', 'erro');
+        }
+    }
+
+    // ✅ EXCLUIR LEMBRETE
+    async function excluirLembrete(id) {
+        if (!confirm('Tem certeza que deseja excluir este lembrete?')) {
+            return;
+        }
+
         try {
             await ipcRenderer.invoke('excluir-lembrete', id);
+            mostrarToast('Lembrete excluído', 'sucesso');
             await carregarLembretes();
-            mostrarToast('Lembrete excluído!', 'sucesso');
-            
         } catch (erro) {
             console.error('Erro ao excluir lembrete:', erro);
             mostrarToast('Erro ao excluir lembrete', 'erro');
         }
     }
-}
 
-async function alternarExtensao() {
-    try {
-        const configuracoes = await ipcRenderer.invoke('carregar-configuracoes');
-        configuracoes.extensaoHabilitada = !configuracoes.extensaoHabilitada;
-        
-        await ipcRenderer.invoke('salvar-configuracoes', configuracoes);
-        atualizarIconesCabecalho(configuracoes);
-        
-        const estado = configuracoes.extensaoHabilitada ? 'ativada' : 'desativada';
-        mostrarToast(`Extensão ${estado}`, 'info');
-        
-    } catch (erro) {
-        console.error('Erro ao alternar extensão:', erro);
-        mostrarToast('Erro ao alterar extensão', 'erro');
-    }
-}
+    // ✅ SALVAR ALARME
+    async function salvarAlarmeHandler() {
+        if (!lembreteEditandoId) return;
 
-async function alternarSomGlobal() {
-    try {
-        const configuracoes = await ipcRenderer.invoke('carregar-configuracoes');
-        configuracoes.somGlobalHabilitado = !configuracoes.somGlobalHabilitado;
-        
-        await ipcRenderer.invoke('salvar-configuracoes', configuracoes);
-        atualizarIconesCabecalho(configuracoes);
-        
-        const estado = configuracoes.somGlobalHabilitado ? 'ativado' : 'desativado';
-        mostrarToast(`Som global ${estado}`, 'info');
-        
-    } catch (erro) {
-        console.error('Erro ao alternar som global:', erro);
-        mostrarToast('Erro ao alterar som', 'erro');
-    }
-}
+        const data = dataAlarme.value;
+        const hora = horaAlarme.value;
 
-function atualizarIconesCabecalho(configuracoes) {
-    const iconeExtensao = document.getElementById('alternar-extensao');
-    const iconeSom = document.getElementById('alternar-som-global');
-
-    iconeExtensao.className = configuracoes.extensaoHabilitada ? 'fas fa-power-off' : 'fas fa-power-off desativado';
-    iconeSom.className = configuracoes.somGlobalHabilitado ? 'fas fa-volume-up' : 'fas fa-volume-up desativado';
-}
-
-async function atualizarStatusSincronizacao() {
-    try {
-        const status = await ipcRenderer.invoke('get-status-sincronizacao');
-        const iconeSincronizacao = document.getElementById('status-sincronizacao');
-        
-        if (status.firebase.inicializado) {
-            iconeSincronizacao.className = 'fas fa-cloud';
-            iconeSincronizacao.title = 'Sincronizado com a nuvem';
-        } else {
-            iconeSincronizacao.className = 'fas fa-cloud desativado';
-            iconeSincronizacao.title = 'Modo offline - sincronização desativada';
+        if (!data || !hora) {
+            mostrarToast('Selecione data e hora', 'erro');
+            return;
         }
-    } catch (erro) {
-        console.error('Erro ao atualizar status:', erro);
+
+        const dataHora = new Date(`${data}T${hora}`);
+        if (dataHora <= new Date()) {
+            mostrarToast('Selecione uma data/hora futura', 'erro');
+            return;
+        }
+
+        try {
+            await ipcRenderer.invoke('configurar-alarme', lembreteEditandoId, dataHora.toISOString());
+            mostrarToast('Alarme configurado com sucesso', 'sucesso');
+            await carregarLembretes();
+            fecharModalHandler();
+        } catch (erro) {
+            console.error('Erro ao configurar alarme:', erro);
+            mostrarToast('Erro ao configurar alarme', 'erro');
+        }
     }
-}
 
-// ✅ FUNÇÕES UTILITÁRIAS
-function escapeHtml(texto) {
-    const div = document.createElement('div');
-    div.textContent = texto;
-    return div.innerHTML;
-}
+    // ✅ REMOVER ALARME
+    async function removerAlarmeHandler() {
+        if (!lembreteEditandoId) return;
 
-function formatarDataHora(dataHoraString) {
-    const dataHora = new Date(dataHoraString);
-    return dataHora.toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-function mostrarToast(mensagem, tipo = 'info') {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
-
-    toast.textContent = mensagem;
-    toast.className = `toast mostrar ${tipo}`;
-
-    setTimeout(() => {
-        toast.classList.remove('mostrar');
-    }, 3000);
-}
-
-// ✅ SINCRONIZAÇÃO MANUAL
-async function sincronizarManualmente() {
-    try {
-        mostrarToast('Sincronizando...', 'info');
-        await ipcRenderer.invoke('sincronizar-manualmente');
-        await carregarLembretes();
-        mostrarToast('Sincronização completa!', 'sucesso');
-    } catch (erro) {
-        console.error('Erro na sincronização manual:', erro);
-        mostrarToast('Erro na sincronização', 'erro');
+        try {
+            await ipcRenderer.invoke('remover-alarme', lembreteEditandoId);
+            mostrarToast('Alarme removido', 'sucesso');
+            await carregarLembretes();
+            fecharModalHandler();
+        } catch (erro) {
+            console.error('Erro ao remover alarme:', erro);
+            mostrarToast('Erro ao remover alarme', 'erro');
+        }
     }
-}
 
-// Adicionar botão de sincronização manual se necessário
-document.addEventListener('DOMContentLoaded', () => {
-    // Adicionar botão de sincronização no cabeçalho se não existir
+    // ✅ ALTERNAR SOM LEMBRETE
+    async function alternarSomLembrete(id) {
+        try {
+            await ipcRenderer.invoke('alternar-som-lembrete', id);
+            await carregarLembretes();
+        } catch (erro) {
+            console.error('Erro ao alternar som:', erro);
+            mostrarToast('Erro ao alternar som', 'erro');
+        }
+    }
+
+    // ✅ ALTERNAR EXTENSÃO
+    async function alternarExtensaoHandler() {
+        try {
+            extensaoHabilitada = !extensaoHabilitada;
+            
+            await ipcRenderer.invoke('salvar-configuracoes', { 
+                extensaoHabilitada, 
+                somGlobalHabilitado 
+            });
+            
+            if (!extensaoHabilitada) {
+                await ipcRenderer.invoke('desativar-todos-alarmes');
+                mostrarToast('🔕 Extensão DESABILITADA - Nenhum alerta será exibido', 'erro');
+            } else {
+                mostrarToast('🔔 Extensão HABILITADA - Alertas ativados', 'sucesso');
+            }
+            
+            atualizarIcones();
+            
+        } catch (erro) {
+            console.error('Erro ao alternar extensão:', erro);
+            mostrarToast('Erro ao alternar extensão', 'erro');
+        }
+    }
+
+    // ✅ ALTERNAR SOM GLOBAL
+    async function alternarSomHandler() {
+        try {
+            somGlobalHabilitado = !somGlobalHabilitado;
+            await ipcRenderer.invoke('salvar-configuracoes', { extensaoHabilitada, somGlobalHabilitado });
+            atualizarIcones();
+            
+            const mensagem = somGlobalHabilitado ? '🔊 Som habilitado' : '🔇 Som desabilitado';
+            mostrarToast(mensagem, 'info');
+        } catch (erro) {
+            console.error('Erro ao alternar som:', erro);
+            mostrarToast('Erro ao alternar som', 'erro');
+        }
+    }
+
+    // ✅ MOSTRAR TOAST
+    function mostrarToast(mensagem, tipo = 'info') {
+        const toast = document.getElementById('toast');
+        toast.textContent = mensagem;
+        toast.className = `toast mostrar ${tipo}`;
+        
+        setTimeout(() => {
+            toast.className = 'toast';
+        }, 3000);
+    }
+
+    // ✅ FUNÇÕES AUXILIARES
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatarData(dataString) {
+        if (!dataString) return 'Sem alarme';
+        
+        const data = new Date(dataString);
+        return data.toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+});
+
+// popup.js - APENAS ADICIONAR BOTÃO SINCRONIZAÇÃO
+// ... (TODO O CÓDIGO ANTERIOR PERMANECE IGUAL) ...
+
+// ✅ ADICIONAR ESTA FUNÇÃO NO FINAL DO ARQUIVO
+function adicionarBotaoSincronizacao() {
     const iconesCabecalho = document.querySelector('.icones-cabecalho');
     if (iconesCabecalho && !document.getElementById('sincronizar-manual')) {
         const botaoSync = document.createElement('i');
         botaoSync.id = 'sincronizar-manual';
         botaoSync.className = 'fas fa-sync-alt';
         botaoSync.title = 'Sincronizar manualmente';
-        botaoSync.addEventListener('click', sincronizarManualmente);
+        botaoSync.style.cursor = 'pointer';
+        botaoSync.style.marginLeft = '10px';
+        
+        botaoSync.addEventListener('click', async () => {
+            try {
+                botaoSync.classList.add('girando');
+                mostrarToast('Sincronizando...', 'info');
+                
+                await ipcRenderer.invoke('sincronizar-manualmente');
+                await carregarLembretes();
+                
+                mostrarToast('Sincronização completa!', 'sucesso');
+            } catch (erro) {
+                console.error('Erro na sincronização:', erro);
+                mostrarToast('Erro na sincronização', 'erro');
+            } finally {
+                botaoSync.classList.remove('girando');
+            }
+        });
+        
         iconesCabecalho.appendChild(botaoSync);
     }
+}
+
+// ✅ ADICIONAR ESTE CSS NO ALERTA.CSS (no final do arquivo)
+/*
+.girando {
+    animation: girar 1s linear infinite;
+}
+
+@keyframes girar {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+*/
+
+// ✅ CHAMAR NO DOMCONTENTLOADED
+document.addEventListener('DOMContentLoaded', async () => {
+    await inicializarAplicacao();
+    adicionarBotaoSincronizacao(); // ← ADICIONAR ESTA LINHA
 });

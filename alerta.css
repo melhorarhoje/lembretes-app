@@ -174,3 +174,27 @@ button:disabled {
 .mensagem-lembrete::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.5);
 }
+
+/* ===== ANIMAÇÃO PARA BOTÃO DE SINCRONIZAÇÃO ===== */
+/* ADICIONAR APENAS ESTAS LINHAS NO FINAL DO ARQUIVO */
+
+.girando {
+    animation: girar 1s linear infinite;
+}
+
+@keyframes girar {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Estilo opcional para o botão de sincronização */
+#sincronizar-manual {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-left: 8px;
+}
+
+#sincronizar-manual:hover {
+    color: #7FFFD4;
+    transform: scale(1.1);
+}
