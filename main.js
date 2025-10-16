@@ -205,7 +205,9 @@ class GerenciadorDados {
         console.log(`💾 Salvo localmente: ${lembrete.mensagem.substring(0, 30)}...`);
 
         // ✅ DEPOIS TENTA SINCRONIZAR COM FIREBASE (BACKGROUND)
-        if (this.firebaseService && this.firebaseService.inicializado) {
+        // Não sincronizar lembretes marcados como locais (aba Pessoal)
+        const salvo = this.localStore.data.lembretes[idLocal];
+        if (!(salvo && salvo.local === true) && this.firebaseService && this.firebaseService.inicializado) {
             this.sincronizarComFirebaseEmBackground(idLocal);
         }
 
@@ -336,7 +338,7 @@ function createMainWindow() {
         resizable: true,
         minimizable: true,
         maximizable: false,
-        title: 'COMPI - Painel de Lembretes'
+        title: 'Painel de Lembretes'
     });
 
     mainWindow.loadFile('index.html');
@@ -435,6 +437,14 @@ ipcMain.handle('carregar-lembretes', async () => {
 
 ipcMain.handle('adicionar-lembrete', async (event, lembrete) => {
     return await gerenciadorDados.salvarLembrete(lembrete);
+});
+
+// Salvar lembrete apenas localmente (aba Pessoal)
+ipcMain.handle('adicionar-lembrete-local', async (event, lembrete) => {
+    // marca como local para facilitar filtro
+    const lembreteLocal = { ...lembrete, local: true };
+    const idLocal = gerenciadorDados.localStore.salvarLembreteLocal(lembreteLocal);
+    return idLocal;
 });
 
 ipcMain.handle('atualizar-texto-lembrete', async (event, id, novoTexto) => {

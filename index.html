@@ -8,7 +8,10 @@
 <body>
   <div class="container">
     <div class="cabecalho">
-      <h2>COMPI - Painel de lembretes</h2>
+      <div class="abas">
+        <button id="aba-compi" class="aba ativa">COMPI</button>
+        <button id="aba-pessoal" class="aba">Pessoal</button>
+      </div>
       <div class="icones-cabecalho">
         <i id="alternar-extensao" class="fas fa-power-off" title="Habilitar/Desabilitar Janela de Alarme"></i>
         <i id="alternar-som-global" class="fas fa-volume-up" title="Habilitar/Desabilitar Som Geral"></i>
@@ -16,6 +19,7 @@
       </div>
     </div>
     
+    <h2 class="titulo-painel">Painel de lembretes</h2>
     <!-- Toast para feedback -->
     <div id="toast" class="toast"></div>
     

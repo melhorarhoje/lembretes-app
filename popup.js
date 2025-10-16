@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let extensaoHabilitada = true;
     let somGlobalHabilitado = true;
     let sincronizacaoAtiva = false;
+        let abaAtual = 'compi'; // 'compi' | 'pessoal'
 
     // ✅ CONFIGURAR DATA MÍNIMA
     const hoje = new Date().toISOString().split('T')[0];
@@ -30,6 +31,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     await carregarLembretes();
     iniciarOuvinteSincronizacao();
 
+        // Configurar abas
+        const abaCompi = document.getElementById('aba-compi');
+        const abaPessoal = document.getElementById('aba-pessoal');
+
+        abaCompi.addEventListener('click', async () => {
+            abaAtual = 'compi';
+            abaCompi.classList.add('ativa');
+            abaPessoal.classList.remove('ativa');
+            document.querySelector('.titulo-painel').textContent = 'Painel de lembretes';
+            await carregarLembretes();
+        });
+
+        abaPessoal.addEventListener('click', async () => {
+            abaAtual = 'pessoal';
+            abaPessoal.classList.add('ativa');
+            abaCompi.classList.remove('ativa');
+            document.querySelector('.titulo-painel').textContent = 'Painel de lembretes';
+            await carregarLembretes();
+        });
     // ✅ EVENT LISTENERS
     btnAdicionar.addEventListener('click', adicionarLembrete);
     entradaLembrete.addEventListener('keypress', (e) => {
@@ -173,9 +193,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             const lembretes = await ipcRenderer.invoke('carregar-lembretes');
             
             lista.innerHTML = '';
-            
-            const lembretesOrdenados = Object.entries(lembretes)
+
+            let entradas = Object.entries(lembretes)
                 .sort(([,a], [,b]) => new Date(b.criadoEm) - new Date(a.criadoEm));
+
+            // Filtrar abas:
+            // - Aba Pessoal: apenas itens explícitos pessoais (lembrete.local === true)
+            // - Aba COMPI: todos exceto itens pessoais
+            if (abaAtual === 'pessoal') {
+                entradas = entradas.filter(([id, lembrete]) => (lembrete && lembrete.local === true));
+            } else {
+                // COMPI: excluir lembretes pessoais
+                entradas = entradas.filter(([id, lembrete]) => !(lembrete && lembrete.local === true));
+            }
+            const lembretesOrdenados = entradas;
             
             if (lembretesOrdenados.length === 0) {
                 lista.innerHTML = '<li class="item-vazio">Nenhum lembrete ainda. Adicione o primeiro!</li>';
@@ -213,6 +244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="texto-lembrete" data-id="${id}">
                     ${escapeHtml(lembrete.mensagem)}
                     ${!sincronizado ? ' <i class="fas fa-cloud-upload-alt icone-sincronizacao" title="Aguardando sincronização"></i>' : ''}
+                    ${lembrete.local === true ? ' <span class="badge-pessoal">Pessoal</span>' : ''}
                 </div>
                 <div class="info-alarme ${classeAlarme}">
                     <i class="fas fa-clock"></i>
@@ -393,7 +425,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 atualizadoEm: new Date().toISOString()
             };
 
-            await ipcRenderer.invoke('adicionar-lembrete', lembrete);
+            if (abaAtual === 'pessoal') {
+                // salvar apenas localmente
+                await ipcRenderer.invoke('adicionar-lembrete-local', lembrete);
+            } else {
+                await ipcRenderer.invoke('adicionar-lembrete', lembrete);
+            }
 
             entradaLembrete.value = '';
             mostrarToast('Lembrete adicionado', 'sucesso');

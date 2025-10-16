@@ -1,0 +1,67 @@
+{
+  "lembretes": {
+    "local_1": {
+      "id": "local_1",
+      "mensagem": "Pessoal 1",
+      "criadoEm": "2025-10-16T16:58:48.038Z",
+      "sincronizado": false,
+      "local": true
+    },
+    "local_2": {
+      "id": "local_2",
+      "mensagem": "Pessoal 2",
+      "criadoEm": "2025-10-16T16:58:48.038Z",
+      "sincronizado": false,
+      "local": true
+    },
+    "f1": {
+      "id": "f1",
+      "mensagem": "Compartilhado 1",
+      "criadoEm": "2025-10-16T16:58:48.039Z",
+      "sincronizado": true
+    },
+    "f2": {
+      "id": "f2",
+      "mensagem": "Compartilhado 2",
+      "criadoEm": "2025-10-16T16:58:48.039Z",
+      "sincronizado": true
+    },
+    "local_1760633928044": {
+      "id": "local_1760633928044",
+      "mensagem": "Nova nota pessoal",
+      "criadoEm": "2025-10-16T16:58:48.044Z",
+      "sincronizado": false,
+      "local": true
+    },
+    "local_pessoal_1760634248595": {
+      "id": "local_pessoal_1760634248595",
+      "mensagem": "Nova nota pessoal",
+      "criadoEm": "2025-10-16T17:04:08.595Z",
+      "sincronizado": false,
+      "local": true
+    },
+    "local_pending_1760634248595": {
+      "id": "local_pending_1760634248595",
+      "mensagem": "Novo local pendente",
+      "criadoEm": "2025-10-16T17:04:08.595Z",
+      "sincronizado": false
+    },
+    "local_pessoal_1760634306099": {
+      "id": "local_pessoal_1760634306099",
+      "mensagem": "Nova nota pessoal",
+      "criadoEm": "2025-10-16T17:05:06.099Z",
+      "sincronizado": false,
+      "local": true
+    },
+    "local_pending_1760634306099": {
+      "id": "local_pending_1760634306099",
+      "mensagem": "Novo local pendente",
+      "criadoEm": "2025-10-16T17:05:06.099Z",
+      "sincronizado": false
+    }
+  },
+  "configuracoes": {
+    "extensaoHabilitada": true,
+    "somGlobalHabilitado": true
+  }
+}
