@@ -139,6 +139,13 @@ class GerenciadorDados {
             // (já existem no localStore)
             this.localStore.salvarDados();
 
+            // Reagendar alarmes com base no snapshot recebido
+            try {
+                reagendarAlarmesAoIniciar();
+            } catch (e) {
+                console.warn('⚠️ Falha ao reagendar alarmes após snapshot:', e && e.message ? e.message : e);
+            }
+
             if (mainWindow) {
                 mainWindow.webContents.send('dados-atualizados', { resumo });
             }
@@ -179,6 +186,14 @@ class GerenciadorDados {
             // que o renderer precise fazer fetch completo.
             if (mainWindow) {
                 mainWindow.webContents.send('dados-atualizados', { mudancas });
+            }
+            
+            // Reagendar alarmes localmente para que a instância atual
+            // dispare o alerta quando chegar o horário configurado.
+            try {
+                reagendarAlarmesAoIniciar();
+            } catch (e) {
+                console.warn('⚠️ Falha ao reagendar alarmes após mudanças:', e && e.message ? e.message : e);
             }
         }
     }

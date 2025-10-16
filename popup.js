@@ -535,8 +535,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         toast.className = `toast mostrar ${tipo}`;
         
         setTimeout(() => {
-            toast.className = 'toast';
-        }, 3000);
+                toast.className = 'toast';
+            }, 2000);
     }
 
     // ✅ FUNÇÕES AUXILIARES

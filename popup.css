@@ -65,14 +65,17 @@ body {
   position: fixed;
   top: 10px;
   right: 10px;
-  padding: 12px 20px;
+  /* menor padding para reduzir altura e não cobrir ícones abaixo */
+  padding: 8px 14px;
   border-radius: 4px;
   color: white;
-  font-size: 14px;
+  font-size: 13px;
+  max-width: 320px;
   z-index: 1000;
   opacity: 0;
   transform: translateX(100%);
-  transition: all 0.3s ease;
+  /* Transição: movimento um pouco mais lento, fade-out rápido */
+  transition: transform 0.28s ease, opacity 0.18s ease;
 }
 
 .toast.mostrar {
