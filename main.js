@@ -328,9 +328,17 @@ let alertaWindow;
 const alarmesAtivos = new Map();
 
 function createMainWindow() {
+    // Tentar carregar ícone customizado em assets/
+    let iconPath = null;
+    const possibleIcons = ['assets/clocklogo.png', 'assets/icon.png', 'assets/icon.ico', 'assets/icon.icns'];
+    for (const p of possibleIcons) {
+        try { if (fs.existsSync(path.join(__dirname, p))) { iconPath = path.join(__dirname, p); break; } } catch (e) { }
+    }
+
     mainWindow = new BrowserWindow({
-        width: 480,
+        width: 520,
         height: 650,
+        icon: iconPath || undefined,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false

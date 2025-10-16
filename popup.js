@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 clearTimeout(debounceAtualizacao);
                 debounceAtualizacao = setTimeout(async () => {
                     await carregarLembretes();
-                    mostrarToast('Dados atualizados de outros usu\u00e1rios', 'info');
+                    mostrarToast('Dados atualizados', 'info');
                 }, 120);
 
                 return;
@@ -110,13 +110,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Se vier um snapshot completo, recarregamos tudo
             if (payload && payload.resumo) {
                 await carregarLembretes();
-                mostrarToast('Dados sincronizados a partir do servidor', 'info');
+                mostrarToast('Dados atualizados', 'info');
                 return;
             }
 
             // Fallback genérico: recarregar
             await carregarLembretes();
-            mostrarToast('Dados atualizados de outros usu\u00e1rios', 'info');
+            mostrarToast('Dados atualizados', 'info');
         });
     }
 
