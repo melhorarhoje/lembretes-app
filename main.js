@@ -361,13 +361,6 @@ function createMainWindow() {
         }
     }, 300);
 
-    // Ao minimizar, esconder para bandeja em vez de minimizar para taskbar
-    mainWindow.on('minimize', (e) => {
-        e.preventDefault();
-        mainWindow.hide();
-        try { mainWindow.setSkipTaskbar(true); } catch (err) {}
-    });
-
     // Ao fechar pela cruz, minimizar para bandeja (a menos que o usuário escolha Sair)
     mainWindow.on('close', (e) => {
         if (!quitApp) {
@@ -449,6 +442,12 @@ function createTray() {
         }
     }
 
+    // Se não carregou um ícone válido, não criar o tray para evitar "espaço vazio".
+    if (!icon || icon.isEmpty && icon.isEmpty()) {
+        console.warn('⚠️ Ícone da bandeja não encontrado ou inválido — não criando tray');
+        return;
+    }
+
     tray = new Tray(icon);
     const contextMenu = Menu.buildFromTemplate([
         { label: 'Abrir', click: () => {
@@ -469,12 +468,27 @@ function createTray() {
     tray.setContextMenu(contextMenu);
     tray.setToolTip('COMPI - Painel de Lembretes');
 
+    // Clique simples restaura a janela
     tray.on('click', () => {
         if (mainWindow) {
             mainWindow.show();
             try { mainWindow.setSkipTaskbar(false); } catch (err) {}
             mainWindow.focus();
         }
+    });
+
+    // Duplo clique também restaura a janela
+    tray.on('double-click', () => {
+        if (mainWindow) {
+            mainWindow.show();
+            try { mainWindow.setSkipTaskbar(false); } catch (err) {}
+            mainWindow.focus();
+        }
+    });
+
+    // Right-click abre o menu (alguns sistemas não disparam click para abrir menu)
+    tray.on('right-click', () => {
+        tray.popUpContextMenu(contextMenu);
     });
 }
 
