@@ -26,7 +26,10 @@
     "appId": "com.compi.lembretes",
     "productName": "COMPI - Painel de Lembretes",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "extraResources": [
+        "tray-icon.png  "
+      ]
     },
     "files": [
       "*.js",
