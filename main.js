@@ -1,5 +1,5 @@
 // main.js - SISTEMA HÍBRIDO COMPLETO (Firebase + Local)
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, Tray, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -326,6 +326,8 @@ const gerenciadorDados = new GerenciadorDados();
 let mainWindow;
 let alertaWindow;
 const alarmesAtivos = new Map();
+let tray = null;
+let quitApp = false;
 
 function createMainWindow() {
     mainWindow = new BrowserWindow({
@@ -343,7 +345,12 @@ function createMainWindow() {
 
     mainWindow.loadFile('index.html');
     Menu.setApplicationMenu(null);
-    
+    // Criar tray (icone de bandeja) — principalmente usado no Windows
+    try {
+        createTray();
+    } catch (e) {
+        console.warn('⚠️ Falha ao criar tray:', e && e.message ? e.message : e);
+    }
     // Iniciar observação após a janela principal ser criada para garantir
     // que eventos enviados ao renderer sejam entregues.
     setTimeout(() => {
@@ -353,6 +360,22 @@ function createMainWindow() {
             console.log('⚠️ Falha ao iniciar observação após criar janela:', e.message);
         }
     }, 300);
+
+    // Ao minimizar, esconder para bandeja em vez de minimizar para taskbar
+    mainWindow.on('minimize', (e) => {
+        e.preventDefault();
+        mainWindow.hide();
+        try { mainWindow.setSkipTaskbar(true); } catch (err) {}
+    });
+
+    // Ao fechar pela cruz, minimizar para bandeja (a menos que o usuário escolha Sair)
+    mainWindow.on('close', (e) => {
+        if (!quitApp) {
+            e.preventDefault();
+            mainWindow.hide();
+            try { mainWindow.setSkipTaskbar(true); } catch (err) {}
+        }
+    });
 }
 
 function createAlertaWindow(lembreteId) {
@@ -377,7 +400,82 @@ function createAlertaWindow(lembreteId) {
     });
 
     alertaWindow.loadFile('alerta.html', { query: { id: lembreteId } });
+
+    // Garantir que a janela de alerta seja mostrada centralizada e com foco,
+    // mesmo se o app estiver oculto na bandeja.
+    alertaWindow.once('ready-to-show', () => {
+        try {
+            alertaWindow.center();
+            alertaWindow.show();
+            // Forçar foco no app (útil no Windows)
+            try { app.focus({ steal: true }); } catch (e) {}
+            try { alertaWindow.focus(); } catch (e) {}
+        } catch (e) {
+            console.warn('⚠️ Erro ao mostrar alerta:', e && e.message ? e.message : e);
+        }
+    });
+
     return alertaWindow;
+}
+
+// Criar tray com menu (Abrir, Sair). Usa assets/tray-icon.png se presente.
+function createTray() {
+    if (tray) return;
+
+    const rootIco = path.join(__dirname, 'tray-icon.ico');
+    const assetsDir = path.join(__dirname, 'assets');
+    const assetsIco = path.join(assetsDir, 'tray-icon.ico');
+    const pngPath = path.join(assetsDir, 'tray-icon.png');
+
+    // Preferir ICO na raiz, depois ICO em assets, depois PNG em assets, depois fallback icon.png
+    let iconPath = null;
+    if (fs.existsSync(rootIco)) iconPath = rootIco;
+    else if (fs.existsSync(assetsIco)) iconPath = assetsIco;
+    else if (fs.existsSync(pngPath)) iconPath = pngPath;
+    else {
+        const fallback = path.join(__dirname, 'icon.png');
+        if (fs.existsSync(fallback)) iconPath = fallback;
+    }
+
+    let icon = undefined;
+    if (iconPath) {
+        try {
+            icon = nativeImage.createFromPath(iconPath);
+            // redimensionar para tray (Windows espera 16x16)
+            icon = icon.resize({ width: 16, height: 16 });
+        } catch (e) {
+            console.warn('⚠️ Não foi possível carregar o ícone da bandeja:', e && e.message ? e.message : e);
+            icon = undefined;
+        }
+    }
+
+    tray = new Tray(icon);
+    const contextMenu = Menu.buildFromTemplate([
+        { label: 'Abrir', click: () => {
+            if (mainWindow) {
+                mainWindow.show();
+                try { mainWindow.setSkipTaskbar(false); } catch (err) {}
+                mainWindow.focus();
+            }
+        } },
+        { type: 'separator' },
+        { label: 'Sair', click: () => {
+            quitApp = true;
+            try { tray.destroy(); } catch (e) {}
+            app.quit();
+        } }
+    ]);
+
+    tray.setContextMenu(contextMenu);
+    tray.setToolTip('COMPI - Painel de Lembretes');
+
+    tray.on('click', () => {
+        if (mainWindow) {
+            mainWindow.show();
+            try { mainWindow.setSkipTaskbar(false); } catch (err) {}
+            mainWindow.focus();
+        }
+    });
 }
 
 // ✅ REAGENDAR ALARMES AO INICIAR
